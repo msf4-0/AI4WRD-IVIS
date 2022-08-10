@@ -17,12 +17,15 @@ from time import perf_counter
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import re
 import numpy as np
+# from imutils.video.webcamvideostream import WebcamVideoStream
+from core.webcam.webcamvideostream import WebcamVideoStream
 
 import pytz
 import cv2
 import pandas as pd
 from psutil import virtual_memory, cpu_percent
 import streamlit as st
+from streamlit import session_state
 
 from colorutils import hex_to_hsv
 from streamlit.uploaded_file_manager import UploadedFile
@@ -576,3 +579,19 @@ def save_image(frame: np.ndarray, save_dir: Path, channels: str = 'BGR',
     else:
         out = frame
     cv2.imwrite(save_path, out)
+
+
+def reset_camera():
+    for k, cap in filter(lambda x: x[0].startswith('camera'), session_state.items()):
+        if isinstance(cap, WebcamVideoStream):
+            cap.stop()
+        elif isinstance(cap, cv2.VideoCapture):
+            # cv2.VideoCapture instance
+            cap.release()
+        del session_state[k]
+
+
+def reset_camera_and_ports():
+    reset_camera()
+    if 'working_ports' in session_state:
+        del session_state['working_ports']

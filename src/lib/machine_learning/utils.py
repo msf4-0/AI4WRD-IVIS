@@ -32,6 +32,7 @@ from keras_unet_collection.activations import Snake, GELU
 
 # >>>> User-defined Modules >>>>
 from core.utils.log import logger
+from data_manager.dataset_management import generate_image_name
 from path_desc import _DIR_APP_NAME, _OLD_DIR_APP_NAME, BASE_DATA_DIR
 if TYPE_CHECKING:
     from training.training_management import AugmentationConfig
@@ -556,10 +557,9 @@ def generate_tfod_xml_csv(image_paths: List[str],
     logger.info('Generating CSV file for augmented bounding boxes ...')
     start = perf_counter()
     xml_list = []
+    all_img_names = set()
     for image_path in stqdm(image_paths):
         image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
         filename = os.path.basename(image_path)
         class_names, bboxes = get_bbox_label_info(xml_df, filename)
         width, height = xml_df.loc[xml_df['filename'] == filename,
@@ -568,8 +568,10 @@ def generate_tfod_xml_csv(image_paths: List[str],
         transformed = transform(image=image, bboxes=bboxes,
                                 class_names=class_names)
         transformed_image = transformed['image']
+
         # also save the transformed image at the same time to avoid doing it again later
-        cv2.imwrite(str(output_img_dir / filename), transformed_image)
+        new_img_name = generate_image_name(filename, all_img_names)
+        cv2.imwrite(str(output_img_dir / new_img_name), transformed_image)
 
         transformed_bboxes = np.array(transformed['bboxes'], dtype=np.int32)
         # this 'class_names' key is based on the 'label_fields' in A.BboxParams()
@@ -577,25 +579,11 @@ def generate_tfod_xml_csv(image_paths: List[str],
         transformed_class_names = transformed['class_names']
 
         for bbox, class_name in zip(transformed_bboxes, transformed_class_names):
-            value = (
-                filename,
-                width,
-                height,
-                class_name,
-                *bbox
-            )
+            value = (new_img_name, width, height, class_name, *bbox)
             xml_list.append(value)
 
-        col_names = [
-            "filename",
-            "width",
-            "height",
-            "classname",
-            "xmin",
-            "ymin",
-            "xmax",
-            "ymax",
-        ]
+    col_names = ["filename", "width", "height", "classname",
+                 "xmin", "ymin", "xmax", "ymax"]
 
     xml_df = pd.DataFrame(xml_list, columns=col_names)
     xml_df.to_csv(csv_path, index=False)

@@ -446,6 +446,15 @@ class Trainer:
                 f'-o "{paths["annotations"] / "test.record"}"'
             )
 
+        if not (paths["annotations"] / "train.record").exists() or \
+                not (paths["annotations"] / "test.record").exists():
+            txt = "Error generating TFRecords, please try again."
+            logger.error(txt)
+            st.error(txt)
+            st.stop()
+
+        logger.info("Successfully generated TFRecords")
+
         # ********************* pipeline.config *********************
         with st.spinner('Generating pipeline config file ...'):
             logger.info('Generating pipeline config file')
@@ -741,11 +750,13 @@ class Trainer:
                 filename = os.path.basename(p)
 
                 start_t = perf_counter()
-                img_with_detections, detections = tfod_inference_pipeline(
+                results = tfod_inference_pipeline(
                     img, model=self.model,
                     conf_threshold=conf_threshold,
                     category_index=category_index,
                     is_checkpoint=is_checkpoint)
+                detections = results['detections']
+                img_with_detections = results['img']
                 time_elapsed = perf_counter() - start_t
                 logger.info(f"Done inference on {filename}. "
                             f"[{time_elapsed:.2f} secs]")
@@ -1532,10 +1543,12 @@ class Trainer:
 
                     img = cv2.imread(p)
                     start_t = perf_counter()
-                    pred_classname, y_proba = classification_inference_pipeline(
+                    results = classification_inference_pipeline(
                         img, model=self.model, image_size=image_size,
                         encoded_label_dict=encoded_label_dict,
                         preprocess_fn=self.preprocess_fn)
+                    pred_classname = results['pred_classname']
+                    y_proba = results['y_proba']
                     time_elapsed = perf_counter() - start_t
                     logger.info(f"Inference on image: {filename} "
                                 f"[{time_elapsed:.4f}s]")
@@ -1570,10 +1583,11 @@ class Trainer:
 
                     image = cv2.imread(img_path)
                     start_t = perf_counter()
-                    pred_output, _ = segment_inference_pipeline(
+                    results = segment_inference_pipeline(
                         image, model=self.model, image_size=image_size,
                         class_colors=class_colors,
                         ignore_background=ignore_background)
+                    pred_output = results['img']
                     time_elapsed = perf_counter() - start_t
                     logger.info(f"Inference on image: {filename} "
                                 f"[{time_elapsed:.4f}s]")

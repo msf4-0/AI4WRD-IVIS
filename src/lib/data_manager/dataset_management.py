@@ -63,9 +63,8 @@ from core.utils.file_handler import (IMAGE_EXTENSIONS, create_folder_if_not_exis
                                      extract_one_to_bytes)
 from core.utils.form_manager import (check_if_exists, check_if_field_empty,
                                      reset_page_attributes)
-from core.utils.helper import get_directory_name, get_filetype, get_mime
+from core.utils.helper import get_directory_name, get_filetype, get_mime, reset_camera_and_ports
 from core.utils.log import logger
-from deployment.utils import reset_camera_and_ports
 # >>>> User-defined Modules >>>>
 from path_desc import BASE_DATA_DIR, CAPTURED_IMAGES_DIR, DATASET_DIR, TEMP_DIR
 
@@ -1264,6 +1263,27 @@ def get_dataset_name_list(dataset_list: List[NamedTuple]) -> Dict[str, NamedTupl
     return dataset_dict
 
 
+def generate_image_name(original_name: str, all_img_names: Set[str]) -> str:
+    """
+    Provide `all_img_names` to be able to check whether the image names 
+    exist within the `all_img_names` or not to generate another new one if exists.
+    """
+    lowercase_ori_name = original_name.lower()
+    # must compare with lowercase as filenames are usually case-insensitive in
+    # in most platforms, e.g. in Windows
+    allowed_chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+
+    def get_code():
+        return get_random_string(length=5, allowed_chars=allowed_chars)
+    new_img_name = f"{get_code()}_{lowercase_ori_name}"
+    if all_img_names:
+        while new_img_name in all_img_names:
+            # to ensure unique names
+            new_img_name = f"{get_code()}_{lowercase_ori_name}"
+        all_img_names.add(new_img_name)
+    return new_img_name
+
+
 def save_single_image(
         img_path: str, dataset_path: Path,
         all_img_names: Set[str] = None, verbose: bool = False) -> Tuple[bool, str, str]:
@@ -1276,19 +1296,7 @@ def save_single_image(
     Returns Tuple[bool, str ,str] for `(success, original_image_name, new_image_name)`
     """
     ori_img_name = os.path.basename(img_path)
-    lowercase_ori_name = ori_img_name.lower()
-    # must compare with lowercase as filenames are usually case-insensitive in
-    # in most platforms, e.g. in Windows
-    allowed_chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-
-    def get_code():
-        return get_random_string(length=8, allowed_chars=allowed_chars)
-    new_img_name = f"{get_code()}_{lowercase_ori_name}"
-    if all_img_names:
-        while new_img_name in all_img_names:
-            # to ensure unique names
-            new_img_name = f"{get_code()}_{lowercase_ori_name}"
-        all_img_names.add(new_img_name)
+    new_img_name = generate_image_name(ori_img_name, all_img_names)
 
     save_path = dataset_path / new_img_name
     success = False

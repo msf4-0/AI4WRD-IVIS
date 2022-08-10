@@ -10,10 +10,9 @@ from pathlib import Path
 import streamlit as st
 import numpy as np
 from paho.mqtt.client import Client
-# from imutils.video.webcamvideostream import WebcamVideoStream
-from core.webcam.webcamvideostream import WebcamVideoStream
 from streamlit import session_state
 import tensorflow as tf
+from core.utils.helper import reset_camera
 
 from core.utils.log import logger
 from machine_learning.utils import classification_predict, preprocess_image, segmentation_predict, tfod_detect
@@ -258,22 +257,6 @@ def reset_csv_file_and_writer():
         del session_state['csv_file']
     if 'csv_writer' in session_state:
         del session_state['csv_writer']
-
-
-def reset_camera():
-    for k, cap in filter(lambda x: x[0].startswith('camera'), session_state.items()):
-        if isinstance(cap, WebcamVideoStream):
-            cap.stop()
-        elif isinstance(cap, cv2.VideoCapture):
-            # cv2.VideoCapture instance
-            cap.release()
-        del session_state[k]
-
-
-def reset_camera_and_ports():
-    reset_camera()
-    if 'working_ports' in session_state:
-        del session_state['working_ports']
 
 
 def reset_record_and_vid_writer():

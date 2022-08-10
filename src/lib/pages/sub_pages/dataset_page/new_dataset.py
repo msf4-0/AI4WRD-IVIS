@@ -55,7 +55,7 @@ from streamlit import session_state
 #                    page_icon="static/media/shrdc_image/shrdc_logo.png", layout=layout)
 
 from core.utils.code_generator import get_random_string
-from core.utils.helper import Timer, list_available_cameras
+from core.utils.helper import Timer, list_available_cameras, reset_camera, reset_camera_and_ports
 from core.utils.file_handler import extract_archive, list_files_in_archived, check_image_files
 from core.utils.log import logger
 from data_manager.database_manager import init_connection
@@ -64,7 +64,6 @@ from path_desc import TEMP_DIR, chdir_root
 from project.project_management import NewProject, Project, ProjectPagination, ProjectPermission
 from annotation.annotation_management import Annotations, NewAnnotations, NewTask, Task
 from user.user_management import User
-from deployment.utils import reset_camera, reset_camera_and_ports
 
 # <<<<<<<<<<<<<<<<<<<<<<TEMP<<<<<<<<<<<<<<<<<<<<<<<
 

@@ -63,16 +63,16 @@ from path_desc import TEMP_DIR, chdir_root
 from core.utils.log import logger
 from core.utils.helper import (Timer, get_all_timezones, get_now_string,
                                list_available_cameras, save_image, get_ram_usage,
-                               get_cpu_usage)
+                               reset_camera)
 from user.user_management import User, UserRole
 from data_manager.database_manager import init_connection
 from project.project_management import Project
 from data_manager.dataset_management import Dataset
-from machine_learning.visuals import create_class_colors, create_color_legend
+from machine_learning.visuals import create_color_legend
 from deployment.deployment_management import DeploymentConfig, DeploymentPagination, Deployment
 from deployment.utils import (ORI_PUBLISH_FRAME_TOPIC, MQTTConfig, MQTTTopics,
                               create_csv_file_and_writer, image_from_buffer, image_to_bytes,
-                              get_mqtt_client, read_images_from_uploaded, reset_camera, reset_video_deployment)
+                              get_mqtt_client, read_images_from_uploaded, reset_video_deployment)
 from dobot_arm_demo import main as dobot_demo
 from csv_label_inspection import csv_label_check as csv_labels
 from Node_Red.Not_dobot_version import Label_View
