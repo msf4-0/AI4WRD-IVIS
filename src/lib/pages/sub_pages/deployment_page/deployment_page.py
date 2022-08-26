@@ -478,20 +478,49 @@ def index(RELEASE=True):
         pipeline_kwargs = {'conf_threshold': conf.confidence_threshold}
 
     if conf.input_type == 'Image':
-        image_type = st.sidebar.radio(
+        sidebar_image_conf_col = st.sidebar.container()
+        sidebar_mqtt_conf_col = st.sidebar.container()
+
+        image_type = sidebar_image_conf_col.radio(
             "Select type of image",
             ("Image from project datasets", "Uploaded Image", "From MQTT"),
             key='select_image_type', on_change=reset_image_idx)
+
+        sidebar_mqtt_conf_col.markdown("___")
+        sidebar_mqtt_conf_col.subheader("MQTT QoS")
+        sidebar_mqtt_conf_col.radio(
+            'MQTT QoS', (0, 1, 2), mqtt_conf.qos, key='mqtt_qos',
+            on_change=update_mqtt_qos)
+
+        with sidebar_mqtt_conf_col.form('form_img_mqtt_topics', clear_on_submit=True):
+            st.subheader("MQTT Topics")
+            st.text_input(
+                'Publish frame to our app', topics.recv_frame,
+                key='image_recv_frame', help="Publish the image frame in bytes/buffer "
+                "to this topic for MQTT input deployment.")
+            st.text_input(
+                'Publishing results to', topics.publish_results,
+                key='publish_results', help="This is used to publish inference results "
+                "to the outside. Our MQTT client is not subscribed to this topic.")
+            st.text_input(
+                f'Publishing frames for to', topics.publish_frame[0],
+                key='publish_frame_0', help="This is used to publish output "
+                "images. Our MQTT client is not subscribed to this topic.")
+            st.form_submit_button(
+                "Update Config", on_click=update_conf_topic,
+                help="Please press this button to update if you change any MQTT "
+                "topic name(s).")
+
         if image_type == "Image from project datasets":
             project_datasets = project.data_name_list.keys()
-            selected_dataset = st.sidebar.selectbox(
+            selected_dataset = sidebar_image_conf_col.selectbox(
                 "Select a dataset from project datasets",
                 project_datasets, key='selected_dataset')
 
             project_image_names = project.data_name_list[selected_dataset]
             total_images = len(project_image_names)
             default_n = 10 if total_images >= 10 else total_images
-            n_images = st.sidebar.number_input(
+            n_images = sidebar_image_conf_col.number_input(
                 "Select number of images to load",
                 1, total_images, default_n, 5, key='n_images',
                 help=(f"Total images in the project is **{total_images}**.  \n"
@@ -501,7 +530,7 @@ def index(RELEASE=True):
             if 'image_idx' not in session_state:
                 session_state.image_idx = 0
 
-            filename = st.sidebar.selectbox(
+            filename = sidebar_image_conf_col.selectbox(
                 "Select a sample image from the project dataset",
                 project_image_names, index=session_state.image_idx, key='filename')
             image_idx = project_image_names.index(filename)
@@ -513,7 +542,7 @@ def index(RELEASE=True):
                 session_state.image_idx = np.random.randint(
                     len(project_image_names))
 
-            st.sidebar.button("Randomly select one", key='btn_random_select',
+            sidebar_image_conf_col.button("Randomly select one", key='btn_random_select',
                               on_click=random_select)
 
             st.markdown("**Selected image from project dataset**")
@@ -521,7 +550,7 @@ def index(RELEASE=True):
             # using this to cater to the case of multiple uploaded images
             imgs_info = ((img, filename),)
         elif image_type == "Uploaded Image":
-            uploaded_imgs = st.sidebar.file_uploader(
+            uploaded_imgs = sidebar_image_conf_col.file_uploader(
                 "Upload image(s)", type=['jpg', 'jpeg', 'png'],
                 key='image_uploader_deploy', accept_multiple_files=True,
                 help="Note that uploading too many images (more than 100) could be very "
@@ -553,34 +582,9 @@ def index(RELEASE=True):
             imgs_info = ((img, filename),)
 
         if DEPLOYMENT_TYPE != 'Semantic Segmentation with Polygons':
-            display_width = st.sidebar.slider(
+            display_width = sidebar_image_conf_col.slider(
                 "Select width of image to resize for display",
                 35, 1000, 500, 5, key='display_width')
-
-        st.sidebar.markdown("___")
-        st.sidebar.subheader("MQTT QoS")
-        st.sidebar.radio(
-            'MQTT QoS', (0, 1, 2), mqtt_conf.qos, key='mqtt_qos',
-            on_change=update_mqtt_qos)
-
-        with st.sidebar.form('form_img_mqtt_topics', clear_on_submit=True):
-            st.subheader("MQTT Topics")
-            st.text_input(
-                'Publish frame to our app', topics.recv_frame,
-                key='image_recv_frame', help="Publish the image frame in bytes/buffer "
-                "to this topic for MQTT input deployment.")
-            st.text_input(
-                'Publishing results to', topics.publish_results,
-                key='publish_results', help="This is used to publish inference results "
-                "to the outside. Our MQTT client is not subscribed to this topic.")
-            st.text_input(
-                f'Publishing frames for to', topics.publish_frame[0],
-                key='publish_frame_0', help="This is used to publish output "
-                "images. Our MQTT client is not subscribed to this topic.")
-            st.form_submit_button(
-                "Update Config", on_click=update_conf_topic,
-                help="Please press this button to update if you change any MQTT "
-                "topic name(s).")
 
         inference_pipeline = deployment.get_inference_pipeline(
             draw_result=True, **pipeline_kwargs)
@@ -1775,6 +1779,8 @@ def index(RELEASE=True):
             now = datetime.now()
             today = now.date()
             if today > session_state.today:
+                logger.info("Reached a new day, checking whether there's any "
+                    "old CSV file to delete, then refresh a new CSV file")
                 session_state.csv_file.close()
 
                 deployment.delete_old_csv_files(
