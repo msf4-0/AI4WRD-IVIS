@@ -339,6 +339,14 @@ def index(RELEASE=True):
 
     # ************************** MQTT CALLBACKS **************************
 
+    def add_recv_frame_cb(topic: str):
+        if conf.input_type == 'Image':
+            client.message_callback_add(
+                topic, image_recv_frame_cb)
+        else:
+            client.message_callback_add(
+                topic, video_recv_frame_cb)
+
     def update_conf_topic():
         """To compare current and previous topics to update the MQTT topics"""
         for topic_attr in topics.__dict__.keys():
@@ -388,12 +396,7 @@ def index(RELEASE=True):
                     client.message_callback_add(
                         new_topic, callback_func)
                 if topic_attr == 'recv_frame':
-                    if conf.input_type == 'Image':
-                        client.message_callback_add(
-                            new_topic, image_recv_frame_cb)
-                    else:
-                        client.message_callback_add(
-                            new_topic, video_recv_frame_cb)
+                    add_recv_frame_cb(new_topic)
                         
                 client.subscribe(new_topic, qos=mqtt_conf.qos)
 
@@ -498,16 +501,10 @@ def index(RELEASE=True):
             reset_image_idx()
             session_state.mqtt_recv_frame = None
             client.message_callback_remove(topics.recv_frame)
-            if session_state.input_type == 'Video':
-                client.message_callback_add(
-                    topics.recv_frame, video_recv_frame_cb)
-            else:
-                # reset to default camera config state
-                reset_single_camera_conf()
-                client.message_callback_add(
-                    topics.recv_frame, image_recv_frame_cb)
-
+            
             conf.input_type = session_state.input_type
+            add_recv_frame_cb(topics.recv_frame)
+
 
         all_timezones = get_all_timezones()
         tz_idx = all_timezones.index(conf.timezone)
