@@ -118,7 +118,7 @@ class DeploymentConfig:
     input_type: str = 'Image'  # or Video
     video_type: str = 'Uploaded Video'  # Or Video Camera or From MQTT
     use_multi_cam: bool = False
-    num_cameras: int = 2
+    num_cameras: int = 1
     video_width: int = 640
     # use_camera: bool = False
     camera_types: List[str] = field(default_factory=list)  # USB or IP Camera
@@ -128,7 +128,7 @@ class DeploymentConfig:
     # camera_ports: List[int] = field(default_factory=lambda: [0, 1])
     # to store the title/view for multiple cameras
     # camera_titles: Dict[int, str] = field(default_factory=dict)
-    camera_titles: List[str] = field(default_factory=list)
+    camera_titles: List[str] = field(default_factory=lambda: [''])
     retention_period: int = 7
     # whether is publishing inference results or not
     publishing: bool = True

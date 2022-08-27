@@ -266,6 +266,79 @@ def index(RELEASE=True):
         # rerun just to avoid displaying unnecessary buttons
         # st.experimental_rerun()
 
+    # ************************** MQTT CALLBACKS **************************
+
+    def start_publish_cb(client, userdata, msg):
+        logger.info("Start publishing")
+        session_state.publishing = True
+        conf.publishing = True
+        session_state.refresh = True
+
+    def stop_publish_cb(client, userdata, msg):
+        logger.info("Stopping publishing ...")
+        # session_state.client_connected = False
+        session_state.publishing = False
+        conf.publishing = False
+        conf.publish_frame = False
+        logger.info("Stopped")
+        session_state.refresh = True
+        # st.success("Stopped publishing")
+        # cannot use this within mqtt callback
+        # st.experimental_rerun()
+
+    def start_publish_frame_cb(client, userdata, msg):
+        logger.info("Start publishing frames")
+        conf.publish_frame = True
+        session_state.refresh = True
+
+    def stop_publish_frame_cb(client, userdata, msg):
+        logger.info("Stopping publishing frames...")
+        conf.publish_frame = False
+        logger.info("Stopped")
+        session_state.refresh = True
+
+    def save_frame_cb(client, userdata, msg):
+        logger.debug(f'Payload received for topic "{msg.topic}"')
+        # need this to access to the frame from within mqtt callback
+        nonlocal output_img, channels
+        save_image(output_img, saved_frame_dir,
+                    channels, conf.timezone)
+
+    def start_record_cb(client, userdata, msg):
+        session_state.record = True
+        session_state.refresh = True
+
+    def stop_record_cb(client, userdata, msg):
+        session_state.record = False
+        session_state.refresh = True
+
+    def dobot_view_cb(client, userdata, msg):
+        # view: str = msg.payload.decode()
+        # logger.info(f"Received message from topic '{msg.topic}': "
+        #             f"'{view}'")
+        # session_state.check_labels = view
+        payload = msg.payload
+        res = deployment.validate_received_label_msg(payload)
+        if res:
+            logger.info("Received MQTT message with proper format from topic "
+                        f"'{msg.topic}' to perform label checking: '{payload}'")
+            session_state.check_labels = res
+        else:
+            session_state.check_labels = None
+
+    topic_callbacks = {
+        topics.start_publish: start_publish_cb,
+        topics.stop_publish: stop_publish_cb,
+        topics.start_publish_frame: start_publish_frame_cb,
+        topics.stop_publish_frame: stop_publish_frame_cb,
+        topics.save_frame: save_frame_cb,
+        topics.start_record: start_record_cb,
+        topics.stop_record: stop_record_cb,
+        topics.dobot_view: dobot_view_cb,
+    }
+
+    # ************************** MQTT CALLBACKS **************************
+
     def update_conf_topic():
         """To compare current and previous topics to update the MQTT topics"""
         for topic_attr in topics.__dict__.keys():
@@ -283,7 +356,11 @@ def index(RELEASE=True):
                     state_key = topic_attr
                     previous_topic = getattr(topics, topic_attr)
 
-                new_topic = session_state[state_key]
+                new_topic = session_state.get(state_key)
+                if new_topic is None:
+                    # session_state for the {state_key} doesn't exist yet
+                    # probably only running image deployment
+                    continue
                 if new_topic == '':
                     logger.error('Topic cannot be empty string')
                     error_msg_place.error(
@@ -305,7 +382,7 @@ def index(RELEASE=True):
                 else:
                     setattr(topics, topic_attr, new_topic)
 
-                callback_func = topic_2cb.get(previous_topic)
+                callback_func = topic_callbacks.get(previous_topic)
                 if callback_func is not None:
                     # only add callbacks for the topics that have callbacks
                     client.message_callback_add(
@@ -496,14 +573,14 @@ def index(RELEASE=True):
             st.subheader("MQTT Topics")
             st.text_input(
                 'Publish frame to our app', topics.recv_frame,
-                key='image_recv_frame', help="Publish the image frame in bytes/buffer "
+                key='recv_frame', help="Publish the image frame in bytes/buffer "
                 "to this topic for MQTT input deployment.")
             st.text_input(
                 'Publishing results to', topics.publish_results,
                 key='publish_results', help="This is used to publish inference results "
                 "to the outside. Our MQTT client is not subscribed to this topic.")
             st.text_input(
-                f'Publishing frames for to', topics.publish_frame[0],
+                f'Publishing frames to', topics.publish_frame[0],
                 key='publish_frame_0', help="This is used to publish output "
                 "images. Our MQTT client is not subscribed to this topic.")
             st.form_submit_button(
@@ -706,7 +783,7 @@ def index(RELEASE=True):
                 "Select type of video input",
                 options, index=idx,
                 key='video_type', help="MQTT should publish frames in bytes to the topic  \n"
-                f"*{mqtt_conf.topics.recv_frame}* (topic can be changed below)",
+                f"*{topics.recv_frame}* (topic can be changed below)",
                 on_change=update_conf_and_reset_video_deploy, args=('video_type',))
         else:
             st.sidebar.markdown(
@@ -991,79 +1068,10 @@ def index(RELEASE=True):
             # for checking labels received through MQTT
             session_state.check_labels = None
 
-        def start_publish_cb(client, userdata, msg):
-            logger.info("Start publishing")
-            session_state.publishing = True
-            conf.publishing = True
-            session_state.refresh = True
-
-        def stop_publish_cb(client, userdata, msg):
-            logger.info("Stopping publishing ...")
-            # session_state.client_connected = False
-            session_state.publishing = False
-            conf.publishing = False
-            conf.publish_frame = False
-            logger.info("Stopped")
-            session_state.refresh = True
-            # st.success("Stopped publishing")
-            # cannot use this within mqtt callback
-            # st.experimental_rerun()
-
-        def start_publish_frame_cb(client, userdata, msg):
-            logger.info("Start publishing frames")
-            conf.publish_frame = True
-            session_state.refresh = True
-
-        def stop_publish_frame_cb(client, userdata, msg):
-            logger.info("Stopping publishing frames...")
-            conf.publish_frame = False
-            logger.info("Stopped")
-            session_state.refresh = True
-
-        def save_frame_cb(client, userdata, msg):
-            logger.debug(f'Payload received for topic "{msg.topic}"')
-            # need this to access to the frame from within mqtt callback
-            nonlocal output_img, channels
-            save_image(output_img, saved_frame_dir,
-                       channels, conf.timezone)
-
-        def start_record_cb(client, userdata, msg):
-            session_state.record = True
-            session_state.refresh = True
-
-        def stop_record_cb(client, userdata, msg):
-            session_state.record = False
-            session_state.refresh = True
-
-        def dobot_view_cb(client, userdata, msg):
-            # view: str = msg.payload.decode()
-            # logger.info(f"Received message from topic '{msg.topic}': "
-            #             f"'{view}'")
-            # session_state.check_labels = view
-            payload = msg.payload
-            res = deployment.validate_received_label_msg(payload)
-            if res:
-                logger.info("Received MQTT message with proper format from topic "
-                            f"'{msg.topic}' to perform label checking: '{payload}'")
-                session_state.check_labels = res
-            else:
-                session_state.check_labels = None
-
-        topic_2cb = {
-            topics.start_publish: start_publish_cb,
-            topics.stop_publish: stop_publish_cb,
-            topics.start_publish_frame: start_publish_frame_cb,
-            topics.stop_publish_frame: stop_publish_frame_cb,
-            topics.save_frame: save_frame_cb,
-            topics.start_record: start_record_cb,
-            topics.stop_record: stop_record_cb,
-            topics.dobot_view: dobot_view_cb,
-        }
-
         def add_video_callbacks():
             # on_message() will serve as fallback when none matched
             # or use this to be more precise on the subscription topic filter
-            for topic, cb in topic_2cb.items():
+            for topic, cb in topic_callbacks.items():
                 client.message_callback_add(topic, cb)
 
         st.sidebar.markdown("___")
@@ -1739,22 +1747,22 @@ def index(RELEASE=True):
                     msg_place[src_idx].success(
                         f"### {view.capitalize()} view: OK")
                     client.publish(
-                        mqtt_conf.topics.send_result_okng, payload="OK")
+                        topics.send_result_okng, payload="OK")
                     client.publish(
-                        mqtt_conf.topics.current_view, payload=view)
+                        topics.current_view, payload=view)
                     client.publish(
-                        mqtt_conf.topics.detected_labels, payload=results)
+                        topics.detected_labels, payload=results)
                 else:
                     logger.warning("Required labels are not detected at "
                                    f"'{view}' view")
                     msg_place[src_idx].error(
                         f"### {view.capitalize()} view: NG")
                     client.publish(
-                        mqtt_conf.topics.send_result_okng, payload="NG")
+                        topics.send_result_okng, payload="NG")
                     client.publish(
-                        mqtt_conf.topics.current_view, payload=view)
+                        topics.current_view, payload=view)
                     client.publish(
-                        mqtt_conf.topics.detected_labels, payload=results)
+                        topics.detected_labels, payload=results)
                     save_image(output_img, ng_frame_dir,
                                channels, timezone=timezone, prefix=view)
                     logger.info(f"NG image saved successfully")
