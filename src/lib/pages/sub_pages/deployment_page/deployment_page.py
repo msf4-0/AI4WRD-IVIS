@@ -177,7 +177,7 @@ def index(RELEASE=True):
         # only refresh for image type
         session_state.refresh = True
 
-    def recv_frame_cb(client, userdata, msg):
+    def video_recv_frame_cb(client, userdata, msg):
         # not refreshing here to speed up video deployment speed
         session_state.mqtt_recv_frame = msg.payload
 
@@ -387,6 +387,14 @@ def index(RELEASE=True):
                     # only add callbacks for the topics that have callbacks
                     client.message_callback_add(
                         new_topic, callback_func)
+                if topic_attr == 'recv_frame':
+                    if conf.input_type == 'Image':
+                        client.message_callback_add(
+                            new_topic, image_recv_frame_cb)
+                    else:
+                        client.message_callback_add(
+                            new_topic, video_recv_frame_cb)
+                        
                 client.subscribe(new_topic, qos=mqtt_conf.qos)
 
                 logger.info(f"Updated MQTTTopics.{topic_attr} from {previous_topic} "
@@ -492,7 +500,7 @@ def index(RELEASE=True):
             client.message_callback_remove(topics.recv_frame)
             if session_state.input_type == 'Video':
                 client.message_callback_add(
-                    topics.recv_frame, recv_frame_cb)
+                    topics.recv_frame, video_recv_frame_cb)
             else:
                 # reset to default camera config state
                 reset_single_camera_conf()
@@ -644,7 +652,7 @@ def index(RELEASE=True):
             msg_place = st.empty()
             if not session_state.mqtt_recv_frame:
                 logger.info("Waiting for image from MQTT ...")
-                # this session_state is set to True in the recv_frame_cb() callback
+                # this session_state is set to True in the video_recv_frame_cb() callback
                 while not session_state.refresh:
                     msg_place.info(
                         "No frame received from MQTT. Waiting ...")
