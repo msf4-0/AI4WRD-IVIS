@@ -631,8 +631,9 @@ def get_tfod_last_ckpt_path(ckpt_dir: Path) -> Path:
     Return None if no ckpt-*.index file found"""
     ckpt_filepaths = glob.glob(str(ckpt_dir / 'ckpt-*.index'))
     if not ckpt_filepaths:
-        logger.warning("There is no checkpoint file found, the TFOD model is "
-                       "not trained yet.")
+        logger.warning(
+            f"There is no checkpoint file found in {ckpt_dir}, "
+            "the TFOD model is not trained yet.")
         return None
 
     latest_ckpt = sorted(ckpt_filepaths, key=get_ckpt_cnt, reverse=True)[0]

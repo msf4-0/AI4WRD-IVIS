@@ -305,9 +305,9 @@ class Trainer:
             uploaded_path = self.training_path['trained_model']
             logger.debug(f"User-uploaded model path: {uploaded_path}")
             # NOTE: these directories are structured so that the user-uploaded model
-            #  files are within (pt_model_dir / PRETRAINED_MODEL_DIRNAME)
+            #  files are within (pt_model_dir / pretrained_model_dirname)
             pt_model_dir = uploaded_path.parent
-            PRETRAINED_MODEL_DIRNAME = uploaded_path.name
+            pretrained_model_dirname = uploaded_path.name
         else:
             logger.info(f"Using pretrained model from TFOD with name: "
                         f"{self.attached_model_name}")
@@ -317,9 +317,9 @@ class Trainer:
             PRETRAINED_MODEL_URL = models_df.loc[
                 models_df['Model Name'] == self.attached_model_name,
                 'model_links'].squeeze()
-            # this PRETRAINED_MODEL_DIRNAME is different from self.attached_model_name,
-            #  PRETRAINED_MODEL_DIRNAME is the the first folder's name in the downloaded tarfile
-            PRETRAINED_MODEL_DIRNAME = PRETRAINED_MODEL_URL.split(
+            # this pretrained_model_dirname is different from self.attached_model_name,
+            #  pretrained_model_dirname is the the first folder's name in the downloaded tarfile
+            pretrained_model_dirname = PRETRAINED_MODEL_URL.split(
                 "/")[-1].split(".tar.gz")[0]
             pt_model_dir = PRE_TRAINED_MODEL_DIR
 
@@ -388,18 +388,24 @@ class Trainer:
             logger.info("Dataset files copied successfully.")
 
         # ************* get the pretrained model if not exists *************
-        if not self.is_not_pretrained and \
-                not (pt_model_dir / PRETRAINED_MODEL_DIRNAME).exists():
+        downloaded_model_dir = pt_model_dir / pretrained_model_dirname
+        if not self.is_not_pretrained and not downloaded_model_dir.exists():
             with st.spinner('Downloading pretrained model ...'):
                 logger.info('Downloading pretrained model')
                 wget.download(PRETRAINED_MODEL_URL, str(pt_model_dir))
-                pretrained_tarfile = pt_model_dir / \
-                    (PRETRAINED_MODEL_DIRNAME + '.tar.gz')
+                pretrained_tarfile = downloaded_model_dir.with_suffix('.tar.gz')
                 with tarfile.open(pretrained_tarfile) as tar:
                     tar.extractall(pt_model_dir)
+                    members = tar.getmembers()
+                    # use the correct folder name, which could be different
+                    folder_name = next(
+                        m.name for m in members if not m.isfile())
                 os.remove(pretrained_tarfile)
-                logger.info(
-                    f'{PRETRAINED_MODEL_DIRNAME} downloaded successfully')
+            downloaded_model_dir = downloaded_model_dir.with_name(folder_name)
+            logger.info(f'Downloaded model at {downloaded_model_dir}')
+        
+        ckpt_file_stem = get_tfod_last_ckpt_path(
+            downloaded_model_dir / 'checkpoint').stem
 
         # ****************** Create label_map.pbtxt ******************
         with st.spinner('Creating labelmap file ...'):
@@ -458,8 +464,7 @@ class Trainer:
         # ********************* pipeline.config *********************
         with st.spinner('Generating pipeline config file ...'):
             logger.info('Generating pipeline config file')
-            original_config_path = pt_model_dir / \
-                PRETRAINED_MODEL_DIRNAME / 'pipeline.config'
+            original_config_path = downloaded_model_dir / 'pipeline.config'
             # copy over the pipeline.config file before modifying it
             shutil.copy2(original_config_path, paths["models"])
 
@@ -474,8 +479,7 @@ class Trainer:
 
             pipeline_config.train_config.batch_size = self.training_param['batch_size']
             pipeline_config.train_config.fine_tune_checkpoint = str(
-                pt_model_dir / PRETRAINED_MODEL_DIRNAME
-                / 'checkpoint' / 'ckpt-0')
+                downloaded_model_dir / 'checkpoint' / ckpt_file_stem)
             pipeline_config.train_config.fine_tune_checkpoint_type = "detection"
             pipeline_config.train_input_reader.label_map_path = str(
                 paths["labelmap_file"])
@@ -489,6 +493,15 @@ class Trainer:
             config_text = text_format.MessageToString(pipeline_config)
             with tf.io.gfile.GFile(paths["config_file"], "wb") as f:
                 f.write(config_text)
+
+            if not paths["config_file"].exists():
+                txt = 'Unable to generate pipeline config file'
+                st.error(txt)
+                logger.error(txt)
+                st.stop()
+
+        logger.info(
+            f'Successfully updated pipeline config file at {paths["config_file"]}')
 
         # ************************ TRAINING ************************
         # the path to the training script file `model_main_tf2.py` used to train our model
