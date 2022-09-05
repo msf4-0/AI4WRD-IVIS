@@ -481,6 +481,7 @@ class Trainer:
             pipeline_config.train_config.fine_tune_checkpoint = str(
                 downloaded_model_dir / 'checkpoint' / ckpt_file_stem)
             pipeline_config.train_config.fine_tune_checkpoint_type = "detection"
+            pipeline_config.train_config.fine_tune_checkpoint_version = "V2"
             pipeline_config.train_input_reader.label_map_path = str(
                 paths["labelmap_file"])
             pipeline_config.train_input_reader.tf_record_input_reader.input_path[:] = [
