@@ -192,6 +192,12 @@ def index(RELEASE=True):
                    " if you want to re-train your model! Otherwise the information"
                    " stored in database would not be correct for the current trained model.")
 
+    if "CenterNet MobileNetV2" in training.attached_model.name:
+        st.warning(
+            """Please change your model from CenterNet MobileNetV2 to 
+        something else as it experiences weird issues currently.""")
+        st.stop()
+
     # ******************************** CONFIG INFO ********************************
     train_config_col, aug_config_col = st.columns([1, 1])
 

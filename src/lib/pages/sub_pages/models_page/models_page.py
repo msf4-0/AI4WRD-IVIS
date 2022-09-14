@@ -293,9 +293,28 @@ def existing_models():
         # to show only relevant models
         if DEPLOYMENT_TYPE == "Object Detection with Bounding Boxes":
             st.markdown(
-                "This table is obtained from TensorFlow Object Detection Model Zoo "
-                "[here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/tf2_detection_zoo.md). "
-                "The speed here actually means latency (ms), thus the lower the better; while higher COCO mAP score is better.")
+                """This table is obtained from TensorFlow Object Detection Model Zoo 
+                [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/tf2_detection_zoo.md). 
+                The speed here actually means latency (ms), thus the lower the
+                better; while higher COCO mAP score is better.""")
+            txt_col, _ = st.columns([2, 1])
+            with txt_col.expander("💡 Useful tips", expanded=True):
+                st.markdown(
+                    """- It is recommended to start with SSD MobileNet, then Faster RCNN 
+models if performance is still not good enough. If there
+is a significant improvement between SSD and Faster RCNN models,
+then only you should consider trying EfficientNet or CenterNet.
+
+- Note that higher COCO mAP score does not directly reflect its
+performance on your dataset as it is highly dependent on the
+type and quality of the dataset the model is being trained on.
+
+- In general, it is always better for you to try to improve the
+quality of your dataset rather than wasting time training with
+different models, although training with higher number of steps
+could improve its performance, you should always try smaller
+number of steps to see whether it's performance on the test set
+improves, otherwise it is not worth training any further.""")
             unwanted_idxs = models_df.loc[models_df['Model Name'].str.contains(
                 "deprecated|Mask R-CNN|ExtremeNet")].index
             # drop deprecated models and Mask R-CNN model
@@ -547,6 +566,11 @@ def existing_models():
                      "or info already exists in database.")
 
     # ***************** NEXT BUTTON **************************
+    if "CenterNet MobileNetV2" in training.attached_model.name:
+        st.warning(
+            """Please change your model from CenterNet MobileNetV2 to 
+        something else as it experiences weird issues currently.""")
+        st.stop()
     with new_training_section_next_button_place:
         if st.button("Submit Model Info", key="models_page_next_button"):
             to_training_configuration_page()

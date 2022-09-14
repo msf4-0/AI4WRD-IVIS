@@ -143,7 +143,7 @@ def download(url, output_dir, filename=None, project_dir=None, return_relative_p
         # else:
         # NOTE: url here is currently a relative path to the DATASET_DIR
         full_image_path = DATASET_DIR / url
-        logger.debug(f"Copying image from {full_image_path} to {filepath}")
+        # logger.debug(f"Copying image from {full_image_path} to {filepath}")
         shutil.copy2(full_image_path, filepath)
         if return_relative_path:
             return os.path.join(os.path.basename(output_dir), filename)

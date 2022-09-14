@@ -393,7 +393,8 @@ class Trainer:
             with st.spinner('Downloading pretrained model ...'):
                 logger.info('Downloading pretrained model')
                 wget.download(PRETRAINED_MODEL_URL, str(pt_model_dir))
-                pretrained_tarfile = downloaded_model_dir.with_suffix('.tar.gz')
+                pretrained_tarfile = downloaded_model_dir.with_suffix(
+                    '.tar.gz')
                 with tarfile.open(pretrained_tarfile) as tar:
                     tar.extractall(pt_model_dir)
                     members = tar.getmembers()
@@ -403,7 +404,7 @@ class Trainer:
                 os.remove(pretrained_tarfile)
             downloaded_model_dir = downloaded_model_dir.with_name(folder_name)
             logger.info(f'Downloaded model at {downloaded_model_dir}')
-        
+
         ckpt_file_stem = get_tfod_last_ckpt_path(
             downloaded_model_dir / 'checkpoint').stem
 
@@ -481,7 +482,6 @@ class Trainer:
             pipeline_config.train_config.fine_tune_checkpoint = str(
                 downloaded_model_dir / 'checkpoint' / ckpt_file_stem)
             pipeline_config.train_config.fine_tune_checkpoint_type = "detection"
-            pipeline_config.train_config.fine_tune_checkpoint_version = "V2"
             pipeline_config.train_input_reader.label_map_path = str(
                 paths["labelmap_file"])
             pipeline_config.train_input_reader.tf_record_input_reader.input_path[:] = [
