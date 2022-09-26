@@ -39,7 +39,10 @@ if total_logfiles > MAX_LOGFILES_TO_KEEP:
     total_to_del = total_logfiles - MAX_LOGFILES_TO_KEEP
     for i, fpath in enumerate(sorted_logfiles, start=1):
         # print(f"Deleting old logfile: {fpath}")
-        fpath.unlink()
+        try:
+            fpath.unlink()
+        except Exception as e:
+            print(f"Failed to delete the old logfile: {e}")
         if i == total_to_del:
             break
 

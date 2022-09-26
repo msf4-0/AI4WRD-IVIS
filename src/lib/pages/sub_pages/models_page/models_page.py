@@ -566,7 +566,8 @@ improves, otherwise it is not worth training any further.""")
                      "or info already exists in database.")
 
     # ***************** NEXT BUTTON **************************
-    if "CenterNet MobileNetV2" in training.attached_model.name:
+    if training.attached_model and \
+        "CenterNet MobileNetV2" in training.attached_model.name:
         st.warning(
             """Please change your model from CenterNet MobileNetV2 to 
         something else as it experiences weird issues currently.""")
