@@ -78,6 +78,17 @@ conn = init_connection(**st.secrets["postgres"])
 
 # >>>> Variable Declaration >>>>
 
+UNSUPPORTED_MODELS = set((
+    # this model got weird issues in the config especially the checkpoint version
+    'CenterNet MobileNetV2 FPN 512x512',
+    # others are all problems with Keypoints
+    'CenterNet HourGlass104 Keypoints 512x512',
+    'CenterNet HourGlass104 Keypoints 1024x1024',
+    'CenterNet Resnet50 V1 FPN Keypoints 512x512',
+    'CenterNet Resnet50 V2 Keypoints 512x512',
+    'CenterNet MobileNetV2 FPN Keypoints 512x512'
+))
+
 
 class ModelType(IntEnum):
     PreTrained = 0

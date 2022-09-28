@@ -52,10 +52,12 @@ from data_manager.data_table_component.data_table import data_table
 from data_manager.database_manager import init_connection
 from pages.sub_pages.models_page.models_subpages.user_model_upload import user_model_upload_page
 from project.project_management import Project
-from training.model_management import Model, ModelType, ModelsPagination, NewModel, get_trained_models_df
-from training.training_management import (NewTraining, NewTrainingPagination,
-                                          NewTrainingSubmissionHandlers,
-                                          Training)
+from training.model_management import (
+    Model, ModelType, ModelsPagination, NewModel, get_trained_models_df,
+    UNSUPPORTED_MODELS)
+from training.training_management import (
+    NewTraining, NewTrainingPagination, NewTrainingSubmissionHandlers,
+    Training)
 from user.user_management import User
 from training.utils import get_pretrained_model_details, get_segmentation_model_func2params
 from machine_learning.visuals import pretty_format_param
@@ -362,9 +364,16 @@ improves, otherwise it is not worth training any further.""")
             options=models_df['Model Name'],
             index=model_idx, key="selected_pretrained_model",
         )
+
+        if selected_model_name in UNSUPPORTED_MODELS:
+            st.warning(
+                f"""Please change your model from **{selected_model_name}** to 
+            something else as it does not properly support object detection task.""")
+            st.stop()
     if training.has_submitted[NewTrainingPagination.Model]:
-        st.warning("WARNING: Changing the selected model will remove all existing "
-                   "trained model data.")
+        st.warning("""
+        **WARNING**: Changing the selected model will remove all existing
+        trained model data for the current training session.""")
 
     # Instantiate an attached model in the page
     model_df_row = Model.filtered_models_dataframe(
@@ -566,12 +575,6 @@ improves, otherwise it is not worth training any further.""")
                      "or info already exists in database.")
 
     # ***************** NEXT BUTTON **************************
-    if training.attached_model and \
-        "CenterNet MobileNetV2" in training.attached_model.name:
-        st.warning(
-            """Please change your model from CenterNet MobileNetV2 to 
-        something else as it experiences weird issues currently.""")
-        st.stop()
     with new_training_section_next_button_place:
         if st.button("Submit Model Info", key="models_page_next_button"):
             to_training_configuration_page()

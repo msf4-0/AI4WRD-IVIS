@@ -57,6 +57,7 @@ from project.project_management import Project
 from training.training_management import NewTrainingPagination, Training, TrainingPagination
 from user.user_management import User
 from deployment.deployment_management import Deployment
+from training.model_management import UNSUPPORTED_MODELS
 
 
 def index(RELEASE=True):
@@ -192,10 +193,10 @@ def index(RELEASE=True):
                    " if you want to re-train your model! Otherwise the information"
                    " stored in database would not be correct for the current trained model.")
 
-    if "CenterNet MobileNetV2" in training.attached_model.name:
+    if training.attached_model.name in UNSUPPORTED_MODELS:
         st.warning(
-            """Please change your model from CenterNet MobileNetV2 to 
-        something else as it experiences weird issues currently.""")
+            f"""Please change your model from **{training.attached_model.name}** to 
+        something else as it does not properly support object detection task.""")
         st.stop()
 
     # ******************************** CONFIG INFO ********************************
