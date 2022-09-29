@@ -290,6 +290,16 @@ class Labels:
                 found_model_field).num_classes = num_classes
         return pipeline_config
 
+    @staticmethod
+    def find_optimizer_field(pipeline_config: pipeline_pb2.TrainEvalPipelineConfig):
+        available_optimizers = (
+            x for x in dir(pipeline_config.train_config.optimizer) 
+            if 'optimizer' in x)
+        for opt in available_optimizers:
+            if pipeline_config.train_config.optimizer.HasField(opt):
+                return opt
+        raise Exception("Cannot find the any optimizer in the pipeline.config file")
+
 
 class TensorFlow(object):
 

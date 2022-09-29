@@ -1,3 +1,4 @@
+import datetime as dt
 from time import perf_counter
 from typing import Dict, Any
 
@@ -53,10 +54,17 @@ class StreamlitOutputCallback(Callback):
         epoch_time = perf_counter() - self._start
         text = (f"**Epoch** {epoch} / {self.num_epochs}. "
                 f"**Epoch time**: {epoch_time:.4f}s.")
+        # only show ETA when it's not final epoch
         if epoch != self.num_epochs:
-            # only show ETA when it's not final epoch
-            eta = (self.num_epochs - epoch) * epoch_time
-            text += f" **ETA**: {eta:.2f}s"
+            time_left = (self.num_epochs - epoch) * epoch_time
+            m, s = divmod(time_left, 60)
+            m, s = int(m), int(s)
+            time_left_formatted = f"{m}m {s}s" if m else f"{s}s"
+
+            now = dt.datetime.now()
+            now += dt.timedelta(seconds=time_left)
+            eta = now.strftime("%a, %b %d, %Y %I:%M %p")
+            text += f" **Estimated time left**: {time_left_formatted}. **ETA**: {eta}"
         st.markdown(text)
 
         if 'learning_rate' in logs:

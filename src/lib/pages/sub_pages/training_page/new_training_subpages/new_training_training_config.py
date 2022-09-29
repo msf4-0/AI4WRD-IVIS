@@ -39,7 +39,8 @@ from streamlit import session_state
 #     sys.path.insert(0, str(LIB_PATH))  # ./lib
 
 # >>>> User-defined Modules >>>>
-from core.utils.log import logger  # logger
+from core.utils.log import logger
+from machine_learning.visuals import plot_cosine_lr_schedule  # logger
 from training.training_management import NewTrainingPagination, Training
 from project.project_management import Project
 from user.user_management import User
@@ -92,7 +93,7 @@ def training_configuration(RELEASE=True):
     if not param_dict:
         # to change NoneType to a Dict
         param_dict = {}
-    logger.debug(f"{param_dict = }")
+    # logger.debug(f"{param_dict = }")
     msg_place = {}
 
     train_config_col, details_col = st.columns([1.5, 2])
@@ -253,9 +254,11 @@ def training_configuration(RELEASE=True):
                           on_click=update_training_param)
         else:
             # ******************************** TFOD config ********************************
-            # only storing `batch_size` and `num_train_steps`
             batch_size = param_dict.get('batch_size', 4)
-            num_train_steps = param_dict.get('num_train_steps', 2000)
+            num_train_steps = param_dict.get('num_train_steps', 5000)
+            learning_rate_base = param_dict.get('learning_rate_base', 0.005)
+            warmup_learning_rate = param_dict.get('warmup_learning_rate', 1e-4)
+            warmup_steps = param_dict.get('warmup_steps', 1000)
 
             with st.form(key='training_config_form'):
                 bs_choices = (1, 2, 4, 8, 16, 32, 64, 128)
@@ -272,14 +275,52 @@ def training_configuration(RELEASE=True):
                 num_train_steps = st.number_input(
                     "Number of training steps", min_value=100,
                     # NOTE: this max_value should be adjusted according to our server limit
-                    max_value=20_000,
+                    max_value=100_000,
                     value=num_train_steps,
                     step=100, key='param_num_train_steps',
                     help="Recommended to train for at least **2000** steps. "
                     "Checkpoint is saved at every 100 steps."
                 )
                 msg_place['num_train_steps'] = st.empty()
+                st.number_input(
+                    "Base learning rate of the cosine annealing schedule", 
+                    1e-5, 1.0,
+                    value=learning_rate_base,
+                    format="%f",
+                    key="param_learning_rate_base",
+                    help="""Peak learning rate. Note that adjusting this value
+                    has a very significant impact on the training progress.
+                    Too high or too low value would result in the model unable
+                    to learn and predict properly.
+                    """
+                )
+                st.number_input(
+                    "Warm up learning rate", 1e-5,
+                    value=warmup_learning_rate,
+                    format="%f",
+                    key="param_warmup_learning_rate",
+                    help="""Initial warm up learning rate"""
+                )
+                st.number_input(
+                    "Warm up steps", 10,
+                    value=warmup_steps,
+                    key="param_warmup_steps",
+                    help="""Number of steps to warm up until reach the base
+                    learning rate"""
+                )
+                submit_plot = st.form_submit_button("Plot learning rate schedule")
                 submit = st.form_submit_button("Submit Config")
+    
+            with details_col:
+                if submit_plot:
+                    lr_params = {
+                        "learning_rate_base": session_state.param_learning_rate_base, 
+                        "num_train_steps": session_state.param_num_train_steps, 
+                        "warmup_learning_rate": session_state.param_warmup_learning_rate, 
+                        "warmup_steps": session_state.param_warmup_steps
+                    }
+                    logger.debug(f"Learning rate parameters: {lr_params}")
+                    plot_cosine_lr_schedule(*lr_params.values())
             if submit:
                 if num_train_steps % 100 != 0:
                     msg_place['num_train_steps'].error(

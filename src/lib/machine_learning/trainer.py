@@ -475,10 +475,33 @@ class Trainer:
                 proto_str = f.read()
                 text_format.Merge(proto_str, pipeline_config)
 
-            pipeline_config = Labels.set_num_classes(len(CLASS_NAMES),
-                                                     pipeline_config=pipeline_config)
+            pipeline_config = Labels.set_num_classes(
+                len(CLASS_NAMES), pipeline_config=pipeline_config)
 
             pipeline_config.train_config.batch_size = self.training_param['batch_size']
+            num_train_steps = self.training_param['num_train_steps']
+            if is_resume:
+                # TFOD takes into account the total steps, instead of resume training
+                # with the steps specified. But currently we allow the user to input
+                # the num_train_steps the user wishes to resume training, so we need this
+                num_train_steps += session_state.new_training.progress['Step']
+            pipeline_config.train_config.num_steps = num_train_steps
+
+            # To configure learning rate
+            opt_name = Labels.find_optimizer_field(pipeline_config)
+            opt_field = getattr(
+                pipeline_config.train_config.optimizer, opt_name)
+            lr_field = opt_field.learning_rate.cosine_decay_learning_rate
+            lr_field.learning_rate_base = self.training_param.get(
+                'learning_rate_base', 0.005)
+            lr_field.total_steps = num_train_steps
+            lr_field.warmup_learning_rate = self.training_param.get(
+                'warmup_learning_rate', 1e-4)
+            lr_field.warmup_steps = self.training_param.get(
+                'warmup_steps', 1000)
+            logger.debug(opt_field)
+
+            # To configure paths
             pipeline_config.train_config.fine_tune_checkpoint = str(
                 downloaded_model_dir / 'checkpoint' / ckpt_file_stem)
             pipeline_config.train_config.fine_tune_checkpoint_type = "detection"
@@ -515,13 +538,6 @@ class Trainer:
         # training from the latest checkpoint! But checkpoint files could take up a lot of
         # space so be careful...
         checkpoint_every_n = 100
-        # change the training steps as necessary, recommended start with 300 to test whether it's working, then train for at least 2000 steps
-        num_train_steps = self.training_param['num_train_steps']
-        if is_resume:
-            # TFOD takes into account the total steps, instead of resume training
-            # with the steps specified. But currently we allow the user to input
-            # the num_train_steps the user wishes to resume training, so we need this
-            num_train_steps += session_state.new_training.progress['Step']
 
         start = perf_counter()
         command = (f'python "{TRAINING_SCRIPT}" '

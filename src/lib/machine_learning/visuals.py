@@ -1,10 +1,13 @@
+import math
 from itertools import zip_longest
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Set, Tuple, Union
 from pathlib import Path
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import seaborn as sns
 
 import streamlit as st
 
@@ -409,3 +412,32 @@ def create_color_legend(class_colors: Dict[str, Tuple[int, int, int]],
     if bgr2rgb:
         legend = cv2.cvtColor(legend, cv2.COLOR_BGR2RGB)
     return legend
+
+
+def get_cosine_lr(curr_step, base_lr, max_lr, warmup_steps, total_steps):
+    if curr_step == total_steps:
+        return base_lr
+    elif curr_step < warmup_steps:
+        return (max_lr - base_lr) * curr_step / warmup_steps + base_lr
+    else:
+        return base_lr + (max_lr - base_lr) \
+            * (1 + math.cos(math.pi * (curr_step - warmup_steps)
+                            / (total_steps - warmup_steps))) / 2
+
+
+def plot_cosine_lr_schedule(
+        learning_rate_base: int, total_steps: int,
+        warmup_learning_rate: int, warmup_steps: int):
+    series = [
+        get_cosine_lr(
+            i, warmup_learning_rate, learning_rate_base,
+            warmup_steps, total_steps)
+        for i in range(total_steps)
+    ]
+
+    fig = plt.figure(figsize=(15, 8))
+    sns.set_style("darkgrid")
+    sns.set_context('talk')
+    sns.lineplot(data=series)
+    plt.title("Learning rate")
+    st.pyplot(fig)
