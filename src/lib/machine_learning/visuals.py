@@ -439,5 +439,6 @@ def plot_cosine_lr_schedule(
     sns.set_style("darkgrid")
     sns.set_context('talk')
     sns.lineplot(data=series)
-    plt.title("Learning rate")
+    plt.title("Cosine Decay Learning Rate Schedule")
+    plt.xlabel("Step")
     st.pyplot(fig)

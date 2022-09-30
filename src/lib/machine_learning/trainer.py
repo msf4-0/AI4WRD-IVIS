@@ -478,6 +478,7 @@ class Trainer:
             pipeline_config = Labels.set_num_classes(
                 len(CLASS_NAMES), pipeline_config=pipeline_config)
 
+            logger.debug(f"{self.training_param = }")
             pipeline_config.train_config.batch_size = self.training_param['batch_size']
             num_train_steps = self.training_param['num_train_steps']
             if is_resume:
@@ -488,18 +489,18 @@ class Trainer:
             pipeline_config.train_config.num_steps = num_train_steps
 
             # To configure learning rate
-            opt_name = Labels.find_optimizer_field(pipeline_config)
-            opt_field = getattr(
-                pipeline_config.train_config.optimizer, opt_name)
-            lr_field = opt_field.learning_rate.cosine_decay_learning_rate
-            lr_field.learning_rate_base = self.training_param.get(
-                'learning_rate_base', 0.005)
-            lr_field.total_steps = num_train_steps
-            lr_field.warmup_learning_rate = self.training_param.get(
-                'warmup_learning_rate', 1e-4)
-            lr_field.warmup_steps = self.training_param.get(
-                'warmup_steps', 1000)
-            logger.debug(opt_field)
+            if self.training_param.get('is_changing_default_lr', False):
+                opt_name = Labels.find_optimizer_field(pipeline_config)
+                opt_field = getattr(
+                    pipeline_config.train_config.optimizer, opt_name)
+                lr_field = opt_field.learning_rate.cosine_decay_learning_rate
+                lr_field.learning_rate_base = self.training_param[
+                    'learning_rate_base']
+                lr_field.total_steps = num_train_steps
+                lr_field.warmup_learning_rate = self.training_param[
+                    'warmup_learning_rate']
+                lr_field.warmup_steps = self.training_param['warmup_steps']
+                logger.debug(opt_field)
 
             # To configure paths
             pipeline_config.train_config.fine_tune_checkpoint = str(

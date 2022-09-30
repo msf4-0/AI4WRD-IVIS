@@ -85,6 +85,9 @@ def training_configuration(RELEASE=True):
 
         st.markdown("""___""")
 
+    if "is_changing_default_lr" not in session_state:
+        session_state.is_changing_default_lr = False
+
     st.markdown(f"### Step 2: Select training configuration.")
 
     DEPLOYMENT_TYPE = session_state.project.deployment_type
@@ -124,6 +127,8 @@ def training_configuration(RELEASE=True):
 
     with train_config_col:
         def update_training_param():
+            # set this so that it can be saved to the training param
+            session_state.param_is_changing_default_lr = session_state.is_changing_default_lr
             training_param = get_training_param_from_session_state(delete=True)
             if DEPLOYMENT_TYPE == "Semantic Segmentation with Polygons" \
                     and not training.attached_model.is_not_pretrained:
@@ -131,6 +136,7 @@ def training_configuration(RELEASE=True):
                 check_segmentation_model(training_param)
             # update the database and our Training instance
             training.update_training_param(training_param)
+            logger.debug(f"{training_param = }")
             training.has_submitted[NewTrainingPagination.TrainingConfig] = True
             logger.info(
                 "Successfully submitted the selected training parameters")
@@ -282,46 +288,70 @@ def training_configuration(RELEASE=True):
                     "Checkpoint is saved at every 100 steps."
                 )
                 msg_place['num_train_steps'] = st.empty()
-                st.number_input(
-                    "Base learning rate of the cosine annealing schedule", 
-                    1e-5, 1.0,
-                    value=learning_rate_base,
-                    format="%f",
-                    key="param_learning_rate_base",
-                    help="""Peak learning rate. Note that adjusting this value
-                    has a very significant impact on the training progress.
-                    Too high or too low value would result in the model unable
-                    to learn and predict properly.
-                    """
-                )
-                st.number_input(
-                    "Warm up learning rate", 1e-5,
-                    value=warmup_learning_rate,
-                    format="%f",
-                    key="param_warmup_learning_rate",
-                    help="""Initial warm up learning rate"""
-                )
-                st.number_input(
-                    "Warm up steps", 10,
-                    value=warmup_steps,
-                    key="param_warmup_steps",
-                    help="""Number of steps to warm up until reach the base
-                    learning rate"""
-                )
-                submit_plot = st.form_submit_button("Plot learning rate schedule")
+
+                if session_state.is_changing_default_lr:
+                    change_lr_btn_name = "Use the default learning rate schedule"
+                else:
+                    change_lr_btn_name = "Change default learning rate schedule"
+                def change_lr_state_cb():
+                    session_state.is_changing_default_lr = not session_state.is_changing_default_lr
+
+                st.form_submit_button(
+                    change_lr_btn_name, on_click=change_lr_state_cb)
+
+                if session_state.is_changing_default_lr:
+                    st.number_input(
+                        "Base learning rate of the cosine annealing schedule",
+                        1e-5, 1.0,
+                        value=learning_rate_base,
+                        format="%f",
+                        key="param_learning_rate_base",
+                        help="""Peak learning rate. Note that adjusting this value
+                        has a very significant impact on the training progress.
+                        Too high or too low value would result in the model unable
+                        to learn and predict properly.
+                        """
+                    )
+                    st.number_input(
+                        "Warm up learning rate", 1e-5, 1.0,
+                        value=warmup_learning_rate,
+                        format="%f",
+                        key="param_warmup_learning_rate",
+                        help="""Initial warm up learning rate"""
+                    )
+                    st.number_input(
+                        "Warm up steps", 10,
+                        value=warmup_steps,
+                        key="param_warmup_steps",
+                        help="""Number of steps to warm up until reach the base
+                        learning rate"""
+                    )
+                    msg_place['warmup_steps'] = st.empty()
+
+                    submit_plot = st.form_submit_button(
+                        "Plot learning rate schedule")
                 submit = st.form_submit_button("Submit Config")
-    
+
             with details_col:
-                if submit_plot:
+                def validate_lr_params():
+                    if session_state.param_warmup_steps >= session_state.param_num_train_steps:
+                        msg_place['warmup_steps'].error(
+                            """Warm up steps must be less than the total
+                        number of training steps.""")
+                        st.stop()
+                if session_state.is_changing_default_lr and submit_plot:
+                    validate_lr_params()
                     lr_params = {
-                        "learning_rate_base": session_state.param_learning_rate_base, 
-                        "num_train_steps": session_state.param_num_train_steps, 
-                        "warmup_learning_rate": session_state.param_warmup_learning_rate, 
+                        "learning_rate_base": session_state.param_learning_rate_base,
+                        "num_train_steps": session_state.param_num_train_steps,
+                        "warmup_learning_rate": session_state.param_warmup_learning_rate,
                         "warmup_steps": session_state.param_warmup_steps
                     }
                     logger.debug(f"Learning rate parameters: {lr_params}")
                     plot_cosine_lr_schedule(*lr_params.values())
             if submit:
+                if session_state.is_changing_default_lr:
+                    validate_lr_params()
                 if num_train_steps % 100 != 0:
                     msg_place['num_train_steps'].error(
                         """Number of training steps must be a multiple of 100 because

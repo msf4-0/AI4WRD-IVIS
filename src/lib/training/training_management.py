@@ -1647,10 +1647,11 @@ class Training(BaseTraining):
                     else:
                         shutil.rmtree(p)
 
-        training_attributes = ["training", "training_pagination", "labelling_pagination",
-                               "all_task", "new_training", "trainer", "start_idx",
-                               "augmentation_config", "process_id"
-                               ]
+        training_attributes = [
+            "training", "training_pagination", "labelling_pagination",
+            "all_task", "new_training", "trainer", "start_idx",
+            "augmentation_config", "process_id", "is_changing_default_lr"
+        ]
         # this might be required to avoid issues with caching model-related variables
         # NOTE: this method has moved from `caching` to `legacy_caching` module in v0.89
         # https://discuss.streamlit.io/t/button-to-clear-cache-and-rerun/3928/12
