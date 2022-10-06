@@ -241,22 +241,25 @@ def export_section():
             converter)
         st.table(format_df)
 
-        depl_type = session_state.project.deployment_type
-        if depl_type == "Image Classification":
-            st.info("""📝 Recommended to choose CSV format, which will also copy your
-            images into individual folders for each class.""")
-        elif depl_type == "Object Detection with Bounding Boxes":
-            st.info("""📝 Recommended to choose Pascal VOC XML format, which is one of
-            the most common formats used for many object detection training algorithms,
-            also the format used for our TensorFlow Object Detection training in this
-            application.""")
-        elif depl_type == "Semantic Segmentation with Polygons":
-            st.info("""📝 Recommended to choose COCO JSON format, which is the most common
-            format used for image segmentation tasks, also the format used for our training
-            in this application.""")
+        info_col, _ = st.columns([2, 1])
+        with info_col:
+            depl_type = session_state.project.deployment_type
+            if depl_type == "Image Classification":
+                st.info("""📝 Recommended to choose CSV format, which will also copy your
+                images into individual folders for each class.""")
+            elif depl_type == "Object Detection with Bounding Boxes":
+                st.info("""📝 Recommended to choose Pascal VOC XML format, which is one of
+                the most common formats used for many object detection training algorithms,
+                also the format used for our TensorFlow Object Detection training in this
+                application.""")
+            elif depl_type == "Semantic Segmentation with Polygons":
+                st.info("""📝 Recommended to choose COCO JSON format, which is the most common
+                format used for image segmentation tasks, also the format used for our training
+                in this application. Choosing COCO format will also export both the original 
+                and the mask images.""")
 
-        st.selectbox("Select your choice of format to export the labeled tasks:",
-                     options=format_df['Format'], key='export_format')
+            st.selectbox("Select your choice of format to export the labeled tasks:",
+                        options=format_df['Format'], key='export_format')
 
     def download_export_tasks():
         with st.spinner("Creating the zipfile, this may take awhile depending on your dataset size..."):
@@ -288,11 +291,12 @@ def export_section():
         downloaded = False
         if zipfile_path is not None and zipfile_path.exists():
             with st.spinner("Creating the Zipfile button to download ... This may take awhile ..."):
+                file_name = f"images-annotations-{session_state.export_format}.zip"
                 with open(zipfile_path, "rb") as fp:
                     downloaded = st.download_button(
                         label="Download Zipfile",
                         data=fp,
-                        file_name="images_annotations.zip",
+                        file_name=file_name,
                         mime="application/zip",
                         key="download_tasks_btn",
                         on_click=reset_zipfile_state,

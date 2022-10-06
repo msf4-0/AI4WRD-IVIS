@@ -573,9 +573,9 @@ class Project(BaseProject):
                 else:
                     logger.error('Error generating COCO JSON file')
 
-            if generate_mask:
-                mask_folder = output_dir / "masks"
-                generate_mask_images(coco_json_path, mask_folder)
+                if generate_mask:
+                    mask_folder = output_dir / "masks"
+                    generate_mask_images(coco_json_path, mask_folder)
 
         logger.info(f"Exported tasks in {export_format} format for "
                     f"{self.deployment_type} for Project ID: {self.id}")
