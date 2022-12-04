@@ -21,12 +21,12 @@ RUN if [ "${NODE_VERSION}" != "none" ]; then su vscode -c "umask 0002 && . /usr/
 # WORKDIR /Integrated-Vision-Inspection-System/
 
 # # [Optional] If your requirements rarely change, uncomment this section to add them to the image.
-COPY requirements_no_hash.txt /tmp/pip-tmp/
-RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
-    && rm -rf /tmp/pip-tmp
+# COPY requirements_no_hash.txt /tmp/pip-tmp/
+# RUN pip3 --disable-pip-version-check --no-cache-dir install -r /tmp/pip-tmp/requirements.txt \
+#     && rm -rf /tmp/pip-tmp
 
 # install TensorFlow Object Detection API (TFOD)
-RUN python src/lib/machine_learning/tfod_installation.py
+# RUN python src/lib/machine_learning/tfod_installation.py
 
 # [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
