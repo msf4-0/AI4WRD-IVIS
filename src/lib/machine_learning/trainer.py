@@ -84,8 +84,8 @@ from .utils import (NASNET_IMAGENET_INPUT_SHAPES, check_unique_label_counts, cla
                     load_tfod_checkpoint, load_tfod_model, load_trained_keras_model, modify_trained_model_layers, preprocess_image,
                     segmentation_predict, segmentation_read_and_preprocess,
                     tf_classification_preprocess_input, tfod_detect, hybrid_loss)
-from .visuals import (PrettyMetricPrinter, create_class_colors, create_color_legend, draw_gt_bboxes,
-                      draw_tfod_bboxes, get_colored_mask_image)
+from .visuals import (PrettyMetricPrinter, create_class_colors, create_color_legend, draw_gt_bboxes, draw_segmentation_classes,
+                      draw_tfod_bboxes, get_colored_mask_image, get_segmentation_data_to_draw_class_names)
 from .callbacks import LRTensorBoard, StreamlitOutputCallback
 from deployment.utils import classification_inference_pipeline, tfod_inference_pipeline, segment_inference_pipeline
 
@@ -1599,6 +1599,9 @@ class Trainer:
                 ignore_background = st.checkbox(
                     "Ignore background", value=True, key='ignore_background',
                     help="Ignore background class for visualization purposes")
+                show_classes = st.checkbox(
+                    "Show classes", value=True, key='show_classes',
+                    help="Show classes for visualization purposes")
                 legend = create_color_legend(
                     class_colors, bgr2rgb=False, ignore_background=ignore_background)
                 st.markdown("**Legend**")
@@ -1624,6 +1627,15 @@ class Trainer:
                     classes_found = class_names_arr[np.unique(pred_mask)]
 
                     pred_output = results['img']
+                    if show_classes:
+                        class_name2color, first_coords = (
+                            get_segmentation_data_to_draw_class_names(
+                            class_colors, pred_mask, self.class_names
+                        ))
+                        draw_segmentation_classes(
+                            pred_output, first_coords, class_name2color,
+                            alpha=0.5, copy_image=False
+                        )
                     time_elapsed = perf_counter() - start_t
                     logger.info(f"Inference on image: {filename} "
                                 f"[{time_elapsed:.4f}s]")

@@ -229,6 +229,100 @@ def create_class_colors(
     return class_colors
 
 
+def get_segmentation_data_to_draw_class_names(
+    class_colors: np.ndarray, pred_mask: np.ndarray, class_names: List[str]
+) -> Tuple[Dict[str, Tuple[int, int, int]], List[Tuple[int, int]]]:
+    colored_mask = class_colors[pred_mask.astype(np.uint8)]
+    class_name2color = {}
+    first_coords = []
+    for i, color in enumerate(class_colors):
+        print(color)
+        if np.all(color == [0, 0, 0]):
+            continue
+        indices = np.where(np.all(colored_mask == color, axis=-1))
+        if len(indices[0]) == 0:
+            continue
+        logger.debug(colored_mask.shape)
+        logger.debug(color)
+        logger.debug(indices)
+        first_coord = next(zip(indices[0], indices[1]))
+        class_name2color[class_names[i]] = tuple(color.tolist())
+        first_coords.append(first_coord)
+    return class_name2color, first_coords
+
+
+def draw_segmentation_classes(
+    image_np: np.ndarray,
+    first_coords: Sequence[Tuple[int, int]],
+    class_colors: Dict[str, Tuple[int, int, int]],
+    alpha: int = 0.5, copy_image: bool = True
+) -> np.ndarray:
+    """Draw bounding boxes on the image and return the drawn image as a copy.
+
+    Args:
+        image_np (np.ndarray): the image to be drawn
+        first_coords (Sequence[Tuple[int, int, int, int]]): First coordinates of
+            each of the classes
+        color (Tuple[int, int, int], optional): color to use for the bounding boxes in
+            this image. Defaults to (0, 150, 0).
+        class_colors (Dict[str, Tuple[int, int, int]], optional): Can be created with the
+            `create_class_colors` function. If this is passed in,
+            these colors are used instead of the `color` passed in. Defaults to None.
+
+    Returns:
+        np.ndarray: the image drawn with bounding boxes
+    """
+    # logger.debug(f"Total annotations for the image: {len(first_coords)}")
+    print(f"Total annotations for the image: {len(first_coords)}")
+    class_names = list(class_colors.keys())
+
+    if copy_image:
+        image_np = image_np.copy()
+
+    for (y, x), class_name in zip(first_coords, class_names):
+        if isinstance(x, float):
+            x, y = int(x), int(y)
+        color = class_colors[class_name]
+
+        y = y - 36 if y - 36 > 0 else y
+        ((label_width, label_height), _) = cv2.getTextSize(
+            class_name, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.75, thickness=2
+        )
+
+        overlay = np.zeros_like(image_np, np.uint8)
+
+        cv2.rectangle(
+            overlay,
+            (x - 1, y),
+            (
+                int(x + label_width * 1.02),
+                int(y + label_height + label_height * 1),
+            ),
+            color=(255, 255, 255),
+            thickness=cv2.FILLED,
+        )
+
+        cv2.putText(
+            overlay,
+            class_name,
+            (
+                int(x + label_width * 0.02),
+                int(y + label_height + label_height * 0.5),
+            ),  # bottom left
+            fontFace=cv2.FONT_HERSHEY_PLAIN,
+            fontScale=1.75,
+            color=color,
+            thickness=2,
+        )
+        # https://stackoverflow.com/a/56472488/12898021
+        # Generate output by blending image with overlay image, using the overlay
+        # images also as mask to limit the blending to those parts
+        mask = overlay.astype(bool)
+        image_np[mask] = cv2.addWeighted(
+            image_np, alpha, overlay, 1 - alpha, 0)[mask]
+    return image_np
+
+
 def draw_gt_bboxes(
     image_np: np.ndarray,
     box_coordinates: Sequence[Tuple[int, int, int, int]],
@@ -365,7 +459,12 @@ def get_colored_mask_image(image: np.ndarray,
     colored_mask = class_colors[mask.astype(np.uint8)]
     if ignore_background:
         # note that this will reduce quite some FPS
-        colored_mask = np.where(colored_mask == [0, 0, 0], image, colored_mask)
+        # colored_mask = np.where(colored_mask == [0, 0, 0], image, colored_mask)
+        mask = colored_mask.astype(bool)
+        image = image.copy()
+        image[mask] = cv2.addWeighted(
+            image, alpha, colored_mask, 1 - alpha, 0)[mask]
+        return image
 
     # perform a weighted combination of the input image with the colored_mask to
     # form an output visualization with different colors for each class
@@ -376,7 +475,7 @@ def get_colored_mask_image(image: np.ndarray,
     return output
 
 
-@st.cache
+@st.cache(ttl=300)
 def create_color_legend(class_colors: Dict[str, Tuple[int, int, int]],
                         bgr2rgb: bool = True,
                         ignore_background: bool = True,
