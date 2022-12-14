@@ -1606,6 +1606,7 @@ class Trainer:
             # convert to array
             class_colors = np.array(list(class_colors.values()),
                                     dtype=np.uint8)
+            class_names_arr = np.array(self.class_names)
             with st.spinner("Running segmentation ..."):
                 for i, (img_path, mask_path) in enumerate(zip(current_image_paths, current_labels)):
                     logger.debug(f"Image path: {img_path}")
@@ -1618,6 +1619,10 @@ class Trainer:
                         image, model=self.model, image_size=image_size,
                         class_colors=class_colors,
                         ignore_background=ignore_background)
+
+                    pred_mask = results['prediction_mask']
+                    classes_found = class_names_arr[np.unique(pred_mask)]
+
                     pred_output = results['img']
                     time_elapsed = perf_counter() - start_t
                     logger.info(f"Inference on image: {filename} "
@@ -1628,6 +1633,8 @@ class Trainer:
 
                     figure_row_place.subheader(
                         f"Image {start + i}: {filename}")
+                    caption = '**Found classes**: ' + ', '.join(classes_found)
+                    figure_row_place.markdown(caption)
                     fig = plt.figure()
                     plt.subplot(131)
                     plt.title("Original Image")
