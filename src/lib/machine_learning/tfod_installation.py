@@ -147,8 +147,10 @@ def install():
     os.chdir(TFOD_DIR / "research")
     run_command('protoc object_detection/protos/*.proto --python_out=.')
     shutil.copy2('object_detection/packages/tf2/setup.py', './setup.py')
-    # NEW: --use-feature=2020-resolver
-    run_command('python -m pip install --use-feature=2020-resolver .')
+    # REMOVED --use-feature=2020-resolver as the new pip use this by default now
+    # https://pip.pypa.io/en/stable/news/#deprecations-and-removals
+    # https://github.com/pypa/pip/pull/11493
+    run_command('pip install .')
     chdir_root()
 
     # run the requirements installation again to make sure all the versions are correct
