@@ -1271,7 +1271,7 @@ class Trainer:
                 X_train, X_test, y_train, y_test = custom_train_test_split(
                     # - BEWARE that the directories might be different if it's user uploaded
                     image_paths=image_paths,
-                    test_size=self.partition_ratio['eval'],
+                    test_size=self.partition_ratio['test'],
                     labels=labels,
                     no_validation=True,
                     stratify=stratify,

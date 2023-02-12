@@ -23,24 +23,54 @@ SPDX-License-Identifier: Apache-2.0
 ========================================================================================
 """
 
-from copy import deepcopy
+import gc
 import json
 import os
 import shutil
 import sys
 import traceback
+from copy import deepcopy
+from dataclasses import dataclass, field
 from enum import IntEnum
 from math import ceil, floor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
-from dataclasses import dataclass, field
-import gc
 
-import tensorflow as tf
 import streamlit as st
+import tensorflow as tf
+from core.utils.code_generator import get_random_string
+
+# >>>> User-defined Modules >>>>
+from core.utils.file_handler import create_folder_if_not_exist
+from core.utils.form_manager import (
+    check_if_exists,
+    check_if_field_empty,
+    reset_page_attributes,
+)
+from core.utils.helper import (
+    NetChange,
+    datetime_formatter,
+    find_net_change,
+    get_directory_name,
+    join_string,
+)
+from core.utils.log import logger  # logger
+from data_manager.database_manager import (
+    db_fetchall,
+    db_fetchone,
+    db_no_fetch,
+    init_connection,
+)
+from deployment.deployment_management import Deployment, DeploymentType
+from machine_learning.command_utils import rename_folder
+from project.project_management import Project
 from streamlit import cli as stcli  # Add CLI so can run Python script directly
 from streamlit import session_state as session_state
-
+from training.model_management import BaseModel, Model, ModelType, NewModel
+from training.utils import (
+    get_segmentation_model_func2params,
+    get_segmentation_model_name2func,
+)
 
 # >>>>>>>>>>>>>>>>>>>>>>TEMP>>>>>>>>>>>>>>>>>>>>>>>>
 # SRC = Path(__file__).resolve().parents[2]  # ROOT folder -> ./src
@@ -49,21 +79,6 @@ from streamlit import session_state as session_state
 #     sys.path.insert(0, str(LIB_PATH))  # ./lib
 # >>>>>>>>>>>>>>>>>>>>>>TEMP>>>>>>>>>>>>>>>>>>>>>>>>
 
-# >>>> User-defined Modules >>>>
-from core.utils.file_handler import create_folder_if_not_exist
-from core.utils.form_manager import (check_if_exists, check_if_field_empty,
-                                     reset_page_attributes)
-from core.utils.helper import (NetChange, datetime_formatter, find_net_change,
-                               get_directory_name, join_string)
-from core.utils.code_generator import get_random_string
-from core.utils.log import logger  # logger
-from data_manager.database_manager import (db_fetchall, db_fetchone,
-                                           db_no_fetch, init_connection)
-from deployment.deployment_management import Deployment, DeploymentType
-from machine_learning.command_utils import rename_folder
-from project.project_management import Project
-from training.model_management import BaseModel, Model, ModelType, NewModel
-from training.utils import get_segmentation_model_func2params, get_segmentation_model_name2func
 
 # <<<<<<<<<<<<<<<<<<<<<<TEMP<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -207,8 +222,8 @@ class BaseTraining:
         self.framework: str = ''
         self.partition_ratio: Dict = {
             'train': 0.8,
-            'eval': 0.2,
-            'test': 0
+            'eval': 0.1,
+            'test': 0.1
         }  # UPDATED
         self.partition_size: Dict = {
             'train': 0,
@@ -545,7 +560,7 @@ class BaseTraining:
 
         try:
 
-            assert partition_ratio['eval'] > 0.0, "Dataset Evaluation Ratio needs to be > 0"
+            assert partition_ratio['test'] > 0.0, "Test set ratio needs to be > 0"
 
             self.partition_ratio = partition_ratio.copy()
             # update dataset_chosen first before calculate partition size
@@ -751,7 +766,7 @@ class NewTraining(BaseTraining):
 
         # submission handler for insertion of Info and Dataset
         try:
-            assert partition_ratio['eval'] > 0.0, "Dataset Evaluation Ratio needs to be > 0"
+            assert partition_ratio['test'] > 0.0, "Test set ratio needs to be > 0"
 
             self.partition_ratio = partition_ratio.copy()
             self.partition_size = self.calc_dataset_partition_size(
@@ -902,7 +917,7 @@ class NewTraining(BaseTraining):
     def reset_new_training_page():
 
         new_training_attributes = ["new_training_name", "new_training_pagination",
-                                   "new_training_desc"]
+                                   "new_training_desc", "partition_ratio"]
 
         reset_page_attributes(new_training_attributes)
 
@@ -1607,8 +1622,8 @@ class Training(BaseTraining):
 
     def get_training_metrics(self) -> Tuple[List[Callable], List[str]]:
         if self.deployment_type == 'Semantic Segmentation with Polygons':
-            from keras_unet_collection.losses import focal_tversky, iou_seg
             from keras.losses import categorical_crossentropy
+            from keras_unet_collection.losses import focal_tversky, iou_seg
 
             metrics = [focal_tversky, categorical_crossentropy, iou_seg]
             use_hybrid_loss = self.training_param_dict.get('use_hybrid_loss')
@@ -1650,7 +1665,8 @@ class Training(BaseTraining):
         training_attributes = [
             "training", "training_pagination", "labelling_pagination",
             "all_task", "new_training", "trainer", "start_idx",
-            "augmentation_config", "process_id", "is_changing_default_lr"
+            "augmentation_config", "process_id", "is_changing_default_lr",
+            "partition_ratio"
         ]
         # this might be required to avoid issues with caching model-related variables
         # NOTE: this method has moved from `caching` to `legacy_caching` module in v0.89

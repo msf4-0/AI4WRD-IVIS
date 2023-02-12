@@ -31,8 +31,22 @@ from time import sleep
 from typing import Union
 
 import streamlit as st
+
+# >>>> User-defined Modules >>>>
+from core.utils.form_manager import remove_newline_trailing_whitespace
+from core.utils.helper import create_dataframe, get_df_row_highlight_color
+from core.utils.log import logger  # logger
+from data_manager.database_manager import init_connection
+from path_desc import chdir_root
 from streamlit import cli as stcli  # Add CLI so can run Python script directly
 from streamlit import session_state as session_state
+from training.model_management import ModelsPagination
+from training.training_management import (
+    NewTraining,
+    NewTrainingPagination,
+    NewTrainingSubmissionHandlers,
+    Training,
+)
 
 # >>>>>>>>>>>>>>>>>>>>>>TEMP>>>>>>>>>>>>>>>>>>>>>>>>
 # DEFINE Web APP page configuration
@@ -46,17 +60,6 @@ from streamlit import session_state as session_state
 #     sys.path.insert(0, str(LIB_PATH))  # ./lib
 # >>>>>>>>>>>>>>>>>>>>>>TEMP>>>>>>>>>>>>>>>>>>>>>>>>
 
-# >>>> User-defined Modules >>>>
-from core.utils.form_manager import remove_newline_trailing_whitespace
-from core.utils.helper import create_dataframe, get_df_row_highlight_color
-from core.utils.log import logger  # logger
-from data_manager.database_manager import init_connection
-from path_desc import chdir_root
-
-from training.training_management import (NewTraining, NewTrainingPagination,
-                                          NewTrainingSubmissionHandlers,
-                                          Training)
-from training.model_management import ModelsPagination
 
 # <<<<<<<<<<<<<<<<<<<<<<TEMP<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -182,23 +185,43 @@ def infodataset():
             st.stop()
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DATASET PARTITION CONFIG >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        partition_ratio = training.partition_ratio.copy()
-        slider_value_1 = partition_ratio['train']
-        slider_value_2 = 1.0 - partition_ratio['test']
-        slider_value = (slider_value_1, slider_value_2)
+        def update_partition_ratio():
+            if round(session_state.input_train_ratio + session_state.input_eval_ratio
+                     + session_state.input_test_ratio, 2) != 1.00:
+                partition_ratio_error_place.error(
+                    'Dataset ratios must sum up to 1.0!')
+                st.stop()
 
-        partition_slider = st.slider(
-            "Dataset Partition Ratio", min_value=0.5, max_value=1.0,
-            value=slider_value, step=0.01, key="partition_slider")
+            session_state.partition_ratio['train'] = session_state.input_train_ratio
+            session_state.partition_ratio['eval'] = session_state.input_eval_ratio
+            session_state.partition_ratio['test'] = session_state.input_test_ratio
 
-        partition_ratio['train'] = partition_slider[0]
-        partition_ratio['eval'] = round(
-            partition_slider[1] - partition_slider[0], 2)
-        partition_ratio['test'] = round(
-            1.0 - partition_slider[1], 2)
+        if 'partition_ratio' not in session_state:
+            session_state.partition_ratio = training.partition_ratio.copy()
+        # slider_value_1 = partition_ratio['train']
+        # slider_value_2 = 1.0 - partition_ratio['test']
+        # slider_value = (slider_value_1, slider_value_2)
+        partition_ratio = session_state.partition_ratio
 
-        with st.expander("Partition info"):
-            st.info("Ratio of Training datasets to Evaluation datasets. Example: '0.5' means the dataset are split randomly and equally into training and evaluation datasets.")
+        st.markdown('Dataset Partition Ratio')
+        st.number_input(
+            'Training set ratio', 0.5, 0.99, value=partition_ratio['train'],
+            step=0.01, format='%.2f', key='input_train_ratio')
+        st.number_input(
+            'Validation set ratio (optional)', 0., 0.99, value=partition_ratio['eval'],
+            step=0.01, format='%.2f', key='input_eval_ratio',
+            help='Optional but recommended. Useful for an extra validation set '
+            'used during training for model evaluation purposes before '
+            'training has finished.')
+        st.number_input(
+            'Testing set ratio', 0.01, 0.99, value=partition_ratio['test'],
+            step=0.01, format='%.2f', key='input_test_ratio')
+        # partition_slider = st.slider(
+        #     "Dataset Partition Ratio", min_value=0.5, max_value=1.0,
+        #     value=slider_value, step=0.01, key="partition_slider")
+        partition_ratio_error_place = st.empty()
+
+        update_partition_ratio()
 
         partition_size = training.calc_dataset_partition_size(
             partition_ratio, dataset_chosen,
@@ -209,10 +232,6 @@ def infodataset():
         #### Evaluation Dataset Ratio: {partition_ratio['eval']} ({partition_size['eval']} data)
         #### Test Dataset Ratio: {partition_ratio['test']} ({partition_size['test']} data)
         """)
-
-        if partition_ratio['eval'] <= 0:
-            st.error(
-                f"Evaluation Dataset Partition Ratio should be more than 0.1")
 
         # >>>> DISPLAY DATASET CHOSEN >>>>
         st.write("### Dataset chosen:")
