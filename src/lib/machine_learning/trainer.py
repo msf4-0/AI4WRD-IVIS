@@ -24,70 +24,123 @@ SPDX-License-Identifier: Apache-2.0
 """
 from __future__ import annotations
 
-from functools import partial
-from itertools import cycle
+import gc
+import glob
 import json
 import math
 import os
-import sys
-import shutil
-from pathlib import Path
-from time import perf_counter, sleep
-from typing import Any, Callable, Dict, List, Tuple, TYPE_CHECKING
-import cv2
-import numpy as np
 import pickle
-import glob
+import shutil
+import sys
 import tarfile
-import gc
+from functools import partial
+from itertools import cycle
+from pathlib import Path
+from time import perf_counter
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple
 
+import cv2
 import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
 import pandas as pd
-import wget
-from sklearn.utils import shuffle
+import seaborn as sns
 import streamlit as st
-from streamlit import session_state
-
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.layers import AveragePooling2D, Flatten, Dense, Dropout, Dense, GlobalAveragePooling2D
-from tensorflow.keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from object_detection.protos import pipeline_pb2
+import wget
 from google.protobuf import text_format
+from imutils.paths import list_images
 from keras_unet_collection import models
 from keras_unet_collection.losses import focal_tversky
-
+from object_detection.protos import pipeline_pb2
 from sklearn.metrics import classification_report, confusion_matrix
-from imutils.paths import list_images
+from sklearn.utils import shuffle
+from streamlit import session_state
+from tensorflow import keras
+from tensorflow.keras.callbacks import Callback, ModelCheckpoint
+from tensorflow.keras.layers import (
+    AveragePooling2D,
+    Dense,
+    Dropout,
+    Flatten,
+    GlobalAveragePooling2D,
+)
 
 SRC = Path(__file__).resolve().parents[2]  # ROOT folder -> ./src
 LIB_PATH = SRC / "lib"
 if str(LIB_PATH) not in sys.path:
     sys.path.insert(0, str(LIB_PATH))  # ./lib
 
+from core.utils.file_handler import create_tarfile
+
 # >>>> User-defined Modules >>>>
 from core.utils.log import logger
-from core.utils.file_handler import create_tarfile
+
 if TYPE_CHECKING:
     from project.project_management import Project
     from training.training_management import Training, AugmentationConfig
+
+from deployment.utils import (
+    classification_inference_pipeline,
+    segment_inference_pipeline,
+    tfod_inference_pipeline,
+)
+from path_desc import (
+    DATASET_DIR,
+    PRE_TRAINED_MODEL_DIR,
+    TFOD_DIR,
+    TFOD_MODELS_TABLE_PATH,
+)
 from training.labelmap_management import Framework, Labels
-from path_desc import DATASET_DIR, TFOD_DIR, PRE_TRAINED_MODEL_DIR, TFOD_MODELS_TABLE_PATH
-from .command_utils import (export_tfod_savedmodel, find_tfod_eval_metrics, run_command,
-                            run_command_update_metrics, find_tfod_metric)
-from .utils import (NASNET_IMAGENET_INPUT_SHAPES, check_unique_label_counts, classification_predict, copy_images,
-                    custom_train_test_split, find_architecture_name, generate_tfod_xml_csv, get_bbox_label_info, get_ckpt_cnt,
-                    get_classif_model_preprocess_func, get_detection_classes, get_mask_path_from_image_path, get_test_images_labels,
-                    get_tfod_last_ckpt_path, get_tfod_test_set_data, get_transform,
-                    load_image_into_numpy_array, load_keras_model, load_labelmap,
-                    load_tfod_checkpoint, load_tfod_model, load_trained_keras_model, modify_trained_model_layers, preprocess_image,
-                    segmentation_predict, segmentation_read_and_preprocess,
-                    tf_classification_preprocess_input, tfod_detect, hybrid_loss)
-from .visuals import (PrettyMetricPrinter, create_class_colors, create_color_legend, draw_gt_bboxes, draw_segmentation_classes,
-                      draw_tfod_bboxes, get_colored_mask_image, get_segmentation_data_to_draw_class_names)
+
 from .callbacks import LRTensorBoard, StreamlitOutputCallback
-from deployment.utils import classification_inference_pipeline, tfod_inference_pipeline, segment_inference_pipeline
+from .command_utils import (
+    export_tfod_savedmodel,
+    find_tfod_eval_metrics,
+    find_tfod_metric,
+    run_command,
+    run_command_update_metrics,
+)
+from .utils import (
+    NASNET_IMAGENET_INPUT_SHAPES,
+    check_unique_label_counts,
+    classification_predict,
+    copy_images,
+    custom_train_test_split,
+    find_architecture_name,
+    generate_tfod_xml_csv,
+    get_bbox_label_info,
+    get_ckpt_cnt,
+    get_classif_model_preprocess_func,
+    get_detection_classes,
+    get_mask_path_from_image_path,
+    get_test_images_labels,
+    get_tfod_last_ckpt_path,
+    get_tfod_test_set_data,
+    get_transform,
+    hybrid_loss,
+    load_image_into_numpy_array,
+    load_keras_model,
+    load_labelmap,
+    load_tfod_checkpoint,
+    load_tfod_model,
+    load_trained_keras_model,
+    modify_trained_model_layers,
+    preprocess_image,
+    segmentation_predict,
+    segmentation_read_and_preprocess,
+    tf_classification_preprocess_input,
+    tfod_detect,
+)
+from .visuals import (
+    PrettyMetricPrinter,
+    create_class_colors,
+    create_color_legend,
+    draw_gt_bboxes,
+    draw_segmentation_classes,
+    draw_tfod_bboxes,
+    get_colored_mask_image,
+    get_segmentation_data_to_draw_class_names,
+)
 
 
 def create_labelmap_file(class_names: List[str], output_dir: Path, deployment_type: str):
@@ -1579,7 +1632,7 @@ class Trainer:
                         encoded_label_dict=encoded_label_dict,
                         preprocess_fn=self.preprocess_fn)
                     pred_classname = results['pred_classname']
-                    y_proba = results['y_proba']
+                    y_proba = results['probability']
                     time_elapsed = perf_counter() - start_t
                     logger.info(f"Inference on image: {filename} "
                                 f"[{time_elapsed:.4f}s]")
@@ -1630,8 +1683,8 @@ class Trainer:
                     if show_classes:
                         class_name2color, first_coords = (
                             get_segmentation_data_to_draw_class_names(
-                            class_colors, pred_mask, self.class_names
-                        ))
+                                class_colors, pred_mask, self.class_names
+                            ))
                         draw_segmentation_classes(
                             pred_output, first_coords, class_name2color,
                             alpha=0.5, copy_image=False

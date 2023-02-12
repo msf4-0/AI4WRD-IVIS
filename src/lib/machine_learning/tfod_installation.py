@@ -26,10 +26,11 @@ import os
 import shlex
 import shutil
 import stat
-import sys
-import wget
 import subprocess
+import sys
 from pathlib import Path
+
+import wget
 
 SRC = Path(__file__).resolve().parents[2]  # ROOT folder -> ./src
 LIB_PATH = SRC / "lib"
@@ -117,6 +118,9 @@ def install():
         'git reset --hard cd21e8ff34b4e389fcdddf04045b14aad8c8a91b')
     chdir_root()
 
+    logger.info('Changing pip version to make sure it always works')
+    run_command('python -m pip install pip==22.0')
+
     # Install Tensorflow Object Detection and dependencies such as protobuf and protoc
     # NOTE: Install COCO API ONLY if you want to perform evaluation
     if os.name == 'posix':
@@ -147,10 +151,8 @@ def install():
     os.chdir(TFOD_DIR / "research")
     run_command('protoc object_detection/protos/*.proto --python_out=.')
     shutil.copy2('object_detection/packages/tf2/setup.py', './setup.py')
-    # REMOVED --use-feature=2020-resolver as the new pip use this by default now
-    # https://pip.pypa.io/en/stable/news/#deprecations-and-removals
-    # https://github.com/pypa/pip/pull/11493
-    run_command('pip install .')
+    # reverted back to an older pip version and use --use-feature=2020-resolver .
+    run_command('python -m pip install --use-feature=2020-resolver .')
     chdir_root()
 
     # run the requirements installation again to make sure all the versions are correct
