@@ -197,10 +197,17 @@ def infodataset():
             session_state.partition_ratio['test'] = session_state.input_test_ratio
 
         if 'partition_ratio' not in session_state:
-            session_state.partition_ratio = training.partition_ratio.copy()
-        # slider_value_1 = partition_ratio['train']
-        # slider_value_2 = 1.0 - partition_ratio['test']
-        # slider_value = (slider_value_1, slider_value_2)
+            partition_ratio = training.partition_ratio.copy()
+            if round(partition_ratio['test'], 2) == 0.00:
+                # For background compatible!! To avoid issues when test set
+                # was set to 0 previously
+                partition_ratio['test'] = partition_ratio['eval']
+                partition_ratio['eval'] = 0.00
+                training.partition_ratio = partition_ratio.copy()
+                # update the database for the correct partition_ratio
+                training.update_training_info()
+            session_state.partition_ratio = partition_ratio
+
         partition_ratio = session_state.partition_ratio
 
         st.markdown('Dataset Partition Ratio')
@@ -216,9 +223,6 @@ def infodataset():
         st.number_input(
             'Testing set ratio', 0.01, 0.99, value=partition_ratio['test'],
             step=0.01, format='%.2f', key='input_test_ratio')
-        # partition_slider = st.slider(
-        #     "Dataset Partition Ratio", min_value=0.5, max_value=1.0,
-        #     value=slider_value, step=0.01, key="partition_slider")
         partition_ratio_error_place = st.empty()
 
         update_partition_ratio()
