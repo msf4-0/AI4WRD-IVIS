@@ -103,7 +103,6 @@ from .command_utils import (
 from .utils import (
     NASNET_IMAGENET_INPUT_SHAPES,
     check_unique_label_counts,
-    classification_predict,
     copy_images,
     custom_train_test_split,
     find_architecture_name,
@@ -118,18 +117,14 @@ from .utils import (
     get_tfod_test_set_data,
     get_transform,
     hybrid_loss,
-    load_image_into_numpy_array,
     load_keras_model,
     load_labelmap,
     load_tfod_checkpoint,
     load_tfod_model,
     load_trained_keras_model,
     modify_trained_model_layers,
-    preprocess_image,
-    segmentation_predict,
     segmentation_read_and_preprocess,
     tf_classification_preprocess_input,
-    tfod_detect,
 )
 from .visuals import (
     PrettyMetricPrinter,
@@ -137,7 +132,6 @@ from .visuals import (
     create_color_legend,
     draw_gt_bboxes,
     draw_segmentation_classes,
-    draw_tfod_bboxes,
     get_colored_mask_image,
     get_segmentation_data_to_draw_class_names,
 )
@@ -175,7 +169,7 @@ class Trainer:
         # with keys: 'train', 'eval', 'test'
         self.partition_ratio: Dict[str, float] = new_training.partition_ratio
         # if user selected both validation and testing partition ratio, we will have validation set
-        self.has_valid_set = True if self.partition_ratio['test'] > 0 else False
+        self.has_valid_set = True if self.partition_ratio['eval'] > 0 else False
         self.dataset_export_path: Path = project.get_export_path()
         self.training_param: Dict[str, Any] = new_training.training_param_dict
         self.class_names: List[str] = project.get_existing_unique_labels(
@@ -347,11 +341,11 @@ class Trainer:
         # training_param only consists of 'batch_size' and 'num_train_steps'
 
         # store this to update the total trained steps later when resuming training
-        if is_resume:
-            previous_trained_steps = session_state.new_training.progress['Step']
+        # if is_resume:
+        #     previous_trained_steps = session_state.new_training.progress['Step']
 
         # this name is used for the output model paths, see self.training_path
-        CUSTOM_MODEL_NAME = self.training_model_name
+        # CUSTOM_MODEL_NAME = self.training_model_name
         if self.is_not_pretrained:
             logger.info(f"Using user-uploaded model for TFOD with name: "
                         f"{self.attached_model_name}")
@@ -1120,8 +1114,8 @@ class Trainer:
 
     def load_and_modify_trained_model(self):
         """
-        This function is used to modify the trained model (uploaded or project model 
-        from other projects) to use it to continue training with the current project 
+        This function is used to modify the trained model (uploaded or project model
+        from other projects) to use it to continue training with the current project
         datasets.
         """
         assert self.is_not_pretrained
@@ -1176,7 +1170,7 @@ class Trainer:
         return [ckpt_cb, tensorboard_cb, st_output_cb]
 
     def load_model_weights(self, model: keras.Model = None, build_model: bool = False):
-        """Load the model weights for evaluation or inference. 
+        """Load the model weights for evaluation or inference.
         If `build_model` is `True`, the model will be rebuilt and load back the weights.
         Or just send in a built model to directly use it to load the weights"""
         if build_model:
@@ -1450,7 +1444,7 @@ class Trainer:
                 cm = confusion_matrix(y_true, preds)
 
                 fig = plt.figure()
-                ax = sns.heatmap(
+                sns.heatmap(
                     cm, cmap="Blues", annot=True, fmt="d", cbar=False,
                     yticklabels=target_names, xticklabels=target_names,
                 )
@@ -1724,7 +1718,6 @@ class Trainer:
                     figure_row_place.pyplot(fig)
                     figure_row_place.markdown("___")
 
-                unique_pixels = np.unique(mask)
                 # logger.debug(f"{unique_pixels = }")
 
         prev_btn_col_2.button('⏮️ Previous samples', key='btn_prev_images_2',

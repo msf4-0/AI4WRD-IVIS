@@ -1,39 +1,39 @@
 from __future__ import annotations
-from collections import Counter
+
 import gc
+import glob
 import json
 import os
 import pickle
+import shutil
+import xml.etree.ElementTree as ET
+from collections import Counter
+from operator import attrgetter
 from pathlib import Path
 from time import perf_counter
-import shutil
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
-import xml.etree.ElementTree as ET
-import glob
-from operator import attrgetter
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
-from imutils.paths import list_images
-from sklearn.model_selection import train_test_split
-import pandas as pd
-import numpy as np
-import cv2
 import albumentations as A
-from pycocotools.coco import COCO
-
+import cv2
+import numpy as np
+import pandas as pd
 import streamlit as st
-from streamlit import session_state
-from stqdm import stqdm
-
 import tensorflow as tf
-from object_detection.utils import config_util, label_map_util
-from object_detection.builders import model_builder
-from keras_unet_collection.losses import focal_tversky, iou_seg
-from keras_unet_collection.activations import Snake, GELU
 
 # >>>> User-defined Modules >>>>
 from core.utils.log import logger
 from data_manager.dataset_management import generate_image_name
+from imutils.paths import list_images
+from keras_unet_collection.activations import GELU, Snake
+from keras_unet_collection.losses import focal_tversky, iou_seg
+from object_detection.builders import model_builder
+from object_detection.utils import config_util, label_map_util
 from path_desc import _DIR_APP_NAME, _OLD_DIR_APP_NAME, BASE_DATA_DIR
+from pycocotools.coco import COCO
+from sklearn.model_selection import train_test_split
+from stqdm import stqdm
+from streamlit import session_state
+
 if TYPE_CHECKING:
     from training.training_management import AugmentationConfig
 
@@ -327,7 +327,6 @@ def check_and_rename_folder_paths_for_backward_compatibility(
         for i in range(len(X_test)):
             # replace the old data path with the new path
             X_test[i] = os.path.join(base_data_dir, X_test[i][app_media_idx:])
-            y_test[i] = os.path.join(base_data_dir, y_test[i][app_media_idx:])
 
         with open(pickle_path, 'wb') as f:
             logger.info(

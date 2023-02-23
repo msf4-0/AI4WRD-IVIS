@@ -1,4 +1,4 @@
-""" 
+"""
 
 Title: New Training InfoDataset
 Date: 3/9/2021
@@ -19,14 +19,13 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 
 Copyright (C) 2021 Selangor Human Resource Development Centre
 SPDX-License-Identifier: Apache-2.0
 ========================================================================================
  """
 import sys
-from pathlib import Path
 from time import sleep
 from typing import Union
 
@@ -327,7 +326,8 @@ def infodataset():
 
         if isinstance(training, Training):
             # Training instance will not need to insert new info anymore, just need to update
-            def insert_function(): return None
+            def insert_function():
+                return None
         else:
             insert_function = training.insert_training_info_dataset
 
