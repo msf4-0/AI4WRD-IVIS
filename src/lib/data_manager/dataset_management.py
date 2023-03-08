@@ -17,7 +17,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 
 Copyright (C) 2021 Selangor Human Resource Development Centre
 SPDX-License-Identifier: Apache-2.0
@@ -28,48 +28,51 @@ import json
 import os
 import shutil
 import sys
-from operator import itemgetter
+import xml.etree.ElementTree as ET
 from base64 import b64encode
-from collections import namedtuple
 from datetime import datetime
 from enum import IntEnum
-from glob import iglob
 from io import BytesIO
 from mimetypes import guess_type
+from operator import itemgetter
 from pathlib import Path
-import tarfile
-from tempfile import mkdtemp
-from time import perf_counter, sleep
+from time import sleep
 from typing import Any, Dict, Iterable, Iterator, List, NamedTuple, Set, Tuple, Union
-import xml.etree.ElementTree as ET
 
 import cv2
-from cv2 import erode
-from natsort import os_sorted
 import numpy as np
-from imutils.paths import list_images
 import pandas as pd
 import streamlit as st
+from core.utils.code_generator import get_random_string
+from core.utils.dataset_handler import get_image_size
+from core.utils.file_handler import (
+    IMAGE_EXTENSIONS,
+    create_folder_if_not_exist,
+    extract_one_to_bytes,
+)
+from core.utils.form_manager import (
+    check_if_exists,
+    check_if_field_empty,
+    reset_page_attributes,
+)
+from core.utils.helper import (
+    get_directory_name,
+    get_filetype,
+    get_mime,
+    reset_camera_and_ports,
+)
+from core.utils.log import logger
+from data_manager.database_manager import db_fetchall, db_fetchone, init_connection
+from imutils.paths import list_images
+from natsort import os_sorted
+
+# >>>> User-defined Modules >>>>
+from path_desc import BASE_DATA_DIR, CAPTURED_IMAGES_DIR, DATASET_DIR, TEMP_DIR
 from PIL import Image
 from stqdm import stqdm
 from streamlit import cli as stcli  # Add CLI so can run Python script directly
-from streamlit import session_state as session_state
 from streamlit.uploaded_file_manager import UploadedFile
 from videoprops import get_audio_properties, get_video_properties
-
-from core.utils.code_generator import get_random_string
-from core.utils.dataset_handler import get_image_size
-from core.utils.file_handler import (IMAGE_EXTENSIONS, create_folder_if_not_exist,
-                                     extract_one_to_bytes)
-from core.utils.form_manager import (check_if_exists, check_if_field_empty,
-                                     reset_page_attributes)
-from core.utils.helper import get_directory_name, get_filetype, get_mime, reset_camera_and_ports
-from core.utils.log import logger
-# >>>> User-defined Modules >>>>
-from path_desc import BASE_DATA_DIR, CAPTURED_IMAGES_DIR, DATASET_DIR, TEMP_DIR
-
-from data_manager.database_manager import (db_fetchall, db_fetchone, db_no_fetch,
-                                           init_connection)
 
 # <<<<<<<<<<<<<<<<<<<<<<TEMP<<<<<<<<<<<<<<<<<<<<<<<
 # initialise connection to Database
@@ -321,7 +324,7 @@ class BaseDataset:
 
         `all_img_names` (Optional[Set[str]]): Provide this to check for existing image names
         to avoid duplicate names. Even if not provided, will still generate random code to
-        prepend to the image names and compare with existing generated image names. 
+        prepend to the image names and compare with existing generated image names.
 
         Returns `error_img_paths` (List[str]) for any images that were not saved successfully.
         """
@@ -374,7 +377,7 @@ class BaseDataset:
     @staticmethod
     def get_image_paths(
             dataset_name: str, return_names: bool = False) -> List[str]:
-        """Get all the image paths from the dataset path. 
+        """Get all the image paths from the dataset path.
 
         If `return_names` is True, return only the image filenames.
         """
@@ -1275,11 +1278,11 @@ def generate_image_name(original_name: str, all_img_names: Set[str]) -> str:
 
     def get_code():
         return get_random_string(length=5, allowed_chars=allowed_chars)
-    new_img_name = f"{get_code()}_{lowercase_ori_name}"
+    new_img_name = f"{lowercase_ori_name}_{get_code()}"
     if all_img_names:
         while new_img_name in all_img_names:
             # to ensure unique names
-            new_img_name = f"{get_code()}_{lowercase_ori_name}"
+            new_img_name = f"{lowercase_ori_name}_{get_code()}"
         all_img_names.add(new_img_name)
     return new_img_name
 
