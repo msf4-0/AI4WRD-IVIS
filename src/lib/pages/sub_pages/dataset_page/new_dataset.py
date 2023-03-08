@@ -16,7 +16,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 
 Copyright (C) 2021 Selangor Human Resource Development Centre
 SPDX-License-Identifier: Apache-2.0
@@ -26,21 +26,47 @@ SPDX-License-Identifier: Apache-2.0
 
 import gc
 import os
-from pathlib import Path
-import sys
 import shutil
+import sys
+from pathlib import Path
 from time import perf_counter, sleep
-from collections import Counter
 
-from natsort import os_sorted
 import cv2
-from imutils.video.webcamvideostream import WebcamVideoStream
-from humanize import naturalsize
 import streamlit as st
+from annotation.annotation_management import Annotations, NewTask, Task
+from core.utils.code_generator import get_random_string
+from core.utils.file_handler import (
+    check_image_files,
+    extract_archive,
+    list_files_in_archived,
+)
+from core.utils.helper import (
+    list_available_cameras,
+    reset_camera,
+    reset_camera_and_ports,
+)
+from core.utils.log import logger
+from data_manager.database_manager import init_connection
+from data_manager.dataset_management import (
+    NewDataset,
+    find_image_path,
+    get_latest_captured_image_path,
+    save_single_image,
+)
+from humanize import naturalsize
+from imutils.video.webcamvideostream import WebcamVideoStream
+from natsort import os_sorted
+from path_desc import TEMP_DIR, chdir_root
+from project.project_management import (
+    NewProject,
+    Project,
+    ProjectPagination,
+    ProjectPermission,
+)
 from stqdm import stqdm
 from streamlit import cli as stcli
 from streamlit import session_state
-
+from user.user_management import User
 
 # >>>>>>>>>>>>>>>>>>>>>>TEMP>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -54,16 +80,6 @@ from streamlit import session_state
 # st.set_page_config(page_title="Integrated Vision Inspection System",
 #                    page_icon="static/media/shrdc_image/shrdc_logo.png", layout=layout)
 
-from core.utils.code_generator import get_random_string
-from core.utils.helper import Timer, list_available_cameras, reset_camera, reset_camera_and_ports
-from core.utils.file_handler import extract_archive, list_files_in_archived, check_image_files
-from core.utils.log import logger
-from data_manager.database_manager import init_connection
-from data_manager.dataset_management import NewDataset, find_image_path, get_dataset_name_list, get_latest_captured_image_path, query_dataset_list, save_single_image
-from path_desc import TEMP_DIR, chdir_root
-from project.project_management import NewProject, Project, ProjectPagination, ProjectPermission
-from annotation.annotation_management import Annotations, NewAnnotations, NewTask, Task
-from user.user_management import User
 
 # <<<<<<<<<<<<<<<<<<<<<<TEMP<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -79,7 +95,7 @@ def new_dataset(RELEASE=True, conn=None, is_new_project: bool = True, is_existin
     `is_new_project`: A flag of creating new dataset for a new project, to ensure we
     can get the default editor_config template labels to remove properly.
 
-    `is_existing_dataset`: A flag of updating an existing dataset, i.e. to add more data to 
+    `is_existing_dataset`: A flag of updating an existing dataset, i.e. to add more data to
     an existing project dataset (which was selected in existing_project_dashboard.py).
 
     `session_state.is_labeled`: A flag to tell whether the user chooses to upload a
@@ -281,7 +297,7 @@ def new_dataset(RELEASE=True, conn=None, is_new_project: bool = True, is_existin
                         """IP camera address could start with *http* or *rtsp*.
                         Most of the IP cameras have a username and password to access
                         the video. In such case, the credentials have to be provided
-                        in the streaming URL as follow: 
+                        in the streaming URL as follow:
                         **rtsp://username:password@192.168.1.64/1**""")
                 if not ip_cam_address:
                     st.warning("Please enter an IP address")
@@ -414,13 +430,13 @@ def new_dataset(RELEASE=True, conn=None, is_new_project: bool = True, is_existin
                     - **Object detection** should have one XML file for each uploaded image.  \n
                     **Filenames** should be **unique** for the best results.  \n
                     - **Image classification** can have two types:  \n
-                    1. *CSV file*: should only have images and only one CSV file, 
+                    1. *CSV file*: should only have images and only one CSV file,
                     the CSV file must contain an *'image'* column for the image path
                     (but the image filenames will be extracted), and another *'label'* column
                     containing the labels for the images.  \n
                     Note that the filenames **must be unique**.  \n
-                    2. *Label by folder names*: Each image is labeled by the folder name they 
-                    reside in. E.g. *cat1.jpg* image is in a folder named as *cat*, this 
+                    2. *Label by folder names*: Each image is labeled by the folder name they
+                    reside in. E.g. *cat1.jpg* image is in a folder named as *cat*, this
                     image will be labeled as *cat*  \n
                     - **Image segmentation** should only have images and only one COCO JSON file.  \n
                     **Filenames** should also be **unique** for the best results.
@@ -542,6 +558,8 @@ def new_dataset(RELEASE=True, conn=None, is_new_project: bool = True, is_existin
                     image_paths = check_image_files(filepaths)
 
         logger.info(f"Found {len(image_paths)} images in the archive.")
+        # sort to always make it maintain the same order every time if possible
+        image_paths.sort()
         dataset.dataset = image_paths
 
         # create a temporary directory for extracting the archive contents
@@ -725,8 +743,8 @@ def new_dataset(RELEASE=True, conn=None, is_new_project: bool = True, is_existin
                 st.stop()
             txt = """NOTE: These images were not found/unreadable and
                 thus skipped, but others are stored successfully in the
-                database. You should check that the annotation file points 
-                to the correct image path. If you think it's safe to ignore, then 
+                database. You should check that the annotation file points
+                to the correct image path. If you think it's safe to ignore, then
                 you may now proceed to enter the current project."""
             with st.expander(txt):
                 st.warning("  \n".join(error_imgs))
