@@ -1272,17 +1272,20 @@ def generate_image_name(original_name: str, all_img_names: Set[str]) -> str:
     exist within the `all_img_names` or not to generate another new one if exists.
     """
     lowercase_ori_name = original_name.lower()
+    lowercase_ori_name_split = lowercase_ori_name.split(".")
+    lowercase_extension = lowercase_ori_name_split[-1]
+    lowercase_img_name = "".join(lowercase_ori_name_split[:-1])
     # must compare with lowercase as filenames are usually case-insensitive in
     # in most platforms, e.g. in Windows
     allowed_chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
     def get_code():
         return get_random_string(length=5, allowed_chars=allowed_chars)
-    new_img_name = f"{lowercase_ori_name}_{get_code()}"
+    new_img_name = f"{lowercase_img_name}_{get_code()}.{lowercase_extension}"
     if all_img_names:
         while new_img_name in all_img_names:
             # to ensure unique names
-            new_img_name = f"{lowercase_ori_name}_{get_code()}"
+            new_img_name = f"{lowercase_img_name}_{get_code()}.{lowercase_extension}"
         all_img_names.add(new_img_name)
     return new_img_name
 
