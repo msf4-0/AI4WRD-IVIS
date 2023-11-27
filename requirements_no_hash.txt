@@ -48,6 +48,7 @@ googleapis-common-protos==1.53.0; python_version >= "3.6" and python_version < "
 grpcio==1.34.1; python_version >= "3.6"
 h5py==3.1.0; python_version >= "3.6"
 hdfs==2.6.0
+html5lib==1.1
 humanize==3.11.0; python_version >= "3.6"
 idna==3.2; python_version >= "3.6" and python_full_version < "3.0.0" or python_full_version >= "3.6.0" and python_version >= "3.6"
 imutils==0.5.4

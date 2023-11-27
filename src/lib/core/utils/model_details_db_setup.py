@@ -5,20 +5,23 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Tuple, Union
 
-from bs4 import BeautifulSoup
-import requests
 import pandas as pd
-import toml
 import psycopg2
+import requests
+import toml
+from bs4 import BeautifulSoup
+from core.utils.log import logger
+from path_desc import (
+    CLASSIF_MODELS_NAME_PATH,
+    SEGMENT_MODELS_TABLE_PATH,
+    TFOD_MODELS_TABLE_PATH,
+)
 from psycopg2.extras import DictCursor, NamedTupleCursor
 
 SRC = Path(__file__).resolve().parents[3]  # ROOT folder -> ./src
 LIB_PATH = SRC / "lib"
 if str(LIB_PATH) not in sys.path:
     sys.path.insert(0, str(LIB_PATH))  # ./lib
-
-from path_desc import TFOD_MODELS_TABLE_PATH, CLASSIF_MODELS_NAME_PATH, SEGMENT_MODELS_TABLE_PATH
-from core.utils.log import logger
 
 
 def connect_db(**context):
@@ -223,17 +226,21 @@ def insert_to_db_if_not_exists(new_df: pd.DataFrame, conn, existing_model_names:
 
 
 def scrape_tfod_data(conn, existing_model_names: List[str]):
-    logger.info("Scraping TensorFlow Models information")
-    link = "https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/tf2_detection_zoo.md"
-    df = pd.read_html(link)[0]
+    import re
 
-    data = requests.get(link)
-    soup = BeautifulSoup(data.content, "html.parser")
-    model_links = soup.select("td a[href]")
-    model_links = [link['href'] for link in model_links]
-    df['model_links'] = model_links
-    df.columns = ["Model Name", "Speed (ms)", "COCO mAP",
-                  "Outputs", "model_links"]
+    logger.info("Scraping TensorFlow Models information")
+    link = "https://raw.githubusercontent.com/tensorflow/models/master/research/object_detection/g3doc/tf2_detection_zoo.md"
+    response = requests.get(link)
+    markdown_content = response.text
+    table_pattern = re.compile(
+        r'\[(.+)\]\((http:.+)\).*\|\s*(\S+)\s*\|\s*(\S+\.*\S*)\s*\|\s*(\S+)')
+    matches = table_pattern.findall(markdown_content)
+    df = pd.DataFrame(
+        matches,
+        columns=['Model Name', 'model_links', 'Speed (ms)',
+                 'COCO mAP', 'Outputs'])
+    df = df[["Model Name", "Speed (ms)", "COCO mAP",
+             "Outputs", "model_links"]]
 
     # save to CSV before formatting for database
     save_df_if_not_exists(df, TFOD_MODELS_TABLE_PATH)
